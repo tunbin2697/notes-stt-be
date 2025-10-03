@@ -4,7 +4,7 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
 import { Resolver, Query } from '@nestjs/graphql';
 
-import { PrismaService } from './prisma.service';
+import { PrismaService } from '@/prisma/prisma.service';
 
 @Resolver()
 export class AppResolver {
