@@ -2,6 +2,22 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+type Tokens {
+  accessToken: String!
+  refreshToken: String!
+}
+
 type Query {
   hello: String!
+}
+
+type Mutation {
+  login(input: LoginInput!): Tokens!
+  refresh(refreshToken: String!): Tokens!
+  logout: Boolean!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
 }
