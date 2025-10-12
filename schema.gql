@@ -4,20 +4,15 @@
 
 type Tokens {
   accessToken: String!
-  refreshToken: String!
 }
 
 type Query {
-  hello: String!
+  health: String!
 }
 
 type Mutation {
-  login(input: LoginInput!): Tokens!
-  refresh(refreshToken: String!): Tokens!
+  login(email: String!, password: String!): Tokens!
+  refresh: Tokens!
   logout: Boolean!
-}
-
-input LoginInput {
-  email: String!
-  password: String!
+  register(email: String!, password: String!): Boolean!
 }

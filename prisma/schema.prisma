@@ -13,12 +13,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+enum Role {
+  USER
+  ADMIN
+}
+
+model Account {
   id            Int            @id @default(autoincrement())
   email         String         @unique
-  password      String // In a real application, ensure passwords are hashed
-  notes         Note[]
-  refreshTokens RefreshToken[] // <- one-to-many relation to refresh tokens
+  password      String?
+  provider      String         @default("native")
+  providerId    String?
+  role          Role           @default(USER)
+  refreshTokens RefreshToken[]
+  profile       Profile?
 }
 
 model Note {
@@ -27,8 +35,8 @@ model Note {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  profileId Int
+  profile   Profile  @relation(fields: [profileId], references: [id])
 }
 
 model RefreshToken {
@@ -37,11 +45,23 @@ model RefreshToken {
   createdAt DateTime @default(now())
   expiresAt DateTime
   revoked   Boolean  @default(false)
-  ip        String? // optional: store client IP
-  device    String? // optional: store device/user-agent
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  accountId Int
+  account   Account  @relation(fields: [accountId], references: [id])
 
-  @@index([userId])
+  @@index([accountId])
   @@index([token])
+}
+
+model Profile {
+  id        Int      @id @default(autoincrement())
+  accountId Int      @unique
+  account   Account  @relation(fields: [accountId], references: [id])
+  notes     Note[]
+  fullName  String?
+  phone     String?
+  location  String?
+  avatar    String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

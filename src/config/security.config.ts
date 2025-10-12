@@ -17,4 +17,10 @@ export const SECURITY_CONFIG = {
       },
     },
   },
+  cors: {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  },
+  auth: {
+    maxDevices: Number(process.env.MAX_DEVICES) || 3,
+  },
 };

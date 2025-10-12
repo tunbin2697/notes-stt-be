@@ -8,9 +8,9 @@ import { PrismaModule } from '@/prisma/prisma.module';
 
 @Resolver()
 export class AppResolver {
-  @Query(() => String)
-  hello(): string {
-    return 'Hello World!';
+  @Query(() => String, { name: 'health' })
+  health(): string {
+    return 'ok';
   }
 }
 
@@ -21,6 +21,7 @@ export class AppResolver {
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'schema.gql'), // auto-generate schema in project root
+      context: ({ req, res }) => ({ req, res }),
       playground: true, // optional
       csrfPrevention: false, // Disable CSRF for development
     }),

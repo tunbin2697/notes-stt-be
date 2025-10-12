@@ -1,7 +1,6 @@
 import { Resolver, Mutation, Args, Context } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginInput } from './dto/login.input';
 import { Tokens } from './dto/tokens.object';
 import { GqlAuthGuard } from '@/security/guards/gql-auth.guard';
 import { SECURITY_CONFIG } from '@/config/security.config';
@@ -12,17 +11,15 @@ export class AuthResolver {
 
   @Mutation(() => Tokens)
   async login(
-    @Args('input') input: LoginInput,
+    @Args('email') email: string,
+    @Args('password') password: string,
     @Context() ctx: any,
   ): Promise<Tokens> {
-    const user = await this.auth.validateUser(input.email, input.password);
+    const user = await this.auth.validateUser(email, password);
     if (!user) throw new Error('Invalid credentials');
 
     const accessToken = this.auth.signAccessToken(user.id);
-    const refreshToken = await this.auth.signRefreshToken(user.id, {
-      ip: ctx.req.ip,
-      device: ctx.req.headers['user-agent'],
-    });
+    const refreshToken = await this.auth.signRefreshToken(user.id);
 
     // set refresh token as httpOnly cookie using centralized config
     ctx.res.cookie(
@@ -31,58 +28,28 @@ export class AuthResolver {
       SECURITY_CONFIG.cookie.refresh.options,
     );
 
-    return { accessToken, refreshToken };
+    return { accessToken };
   }
 
   @Mutation(() => Tokens)
-  async refresh(
-    @Args('refreshToken') refreshToken: string,
-    @Context() ctx: any,
-  ): Promise<Tokens> {
-    // rotateRefreshToken will revoke the old and create a new one
-    // but we need to validate
-    const decoded: any = null; // you should verify jwt here, omitted for brevity
-    // This is a simplified example - real-world usage must validate signature
+  async refresh(@Context() ctx: any): Promise<Tokens> {
+    const rawRefresh = ctx.req.cookies?.[SECURITY_CONFIG.cookie.refresh.name];
+    if (!rawRefresh) throw new Error('No refresh token');
 
-    // find user from token (or pass userId as claim)
-    // here we simplify: decode sub from jwt
-    const jwt = require('jsonwebtoken');
-    let payload: any;
-    try {
-      payload = jwt.verify(refreshToken, process.env.JWT_SECRET);
-    } catch (err) {
-      throw new Error('Invalid refresh token');
-    }
+    const accessToken = await this.auth.useRefreshToken(rawRefresh);
+    if (!accessToken) throw new Error('Invalid refresh token');
 
-    if (payload.type !== 'refresh') throw new Error('Not a refresh token');
-
-    const newRaw = await this.auth.rotateRefreshToken(
-      refreshToken,
-      payload.sub,
-      { ip: ctx.req.ip, device: ctx.req.headers['user-agent'] },
-    );
-    if (!newRaw) throw new Error('Refresh token not found');
-
-    const accessToken = this.auth.signAccessToken(payload.sub);
-
-    ctx.res.cookie(
-      SECURITY_CONFIG.cookie.refresh.name,
-      newRaw,
-      SECURITY_CONFIG.cookie.refresh.options,
-    );
-
-    return { accessToken, refreshToken: newRaw };
+    return { accessToken };
   }
 
   @UseGuards(GqlAuthGuard)
   @Mutation(() => Boolean)
   async logout(@Context() ctx: any) {
     const user = ctx.req.user;
-    const rawRefresh = ctx.req.cookies?.refreshToken;
+    const rawRefresh = ctx.req.cookies?.[SECURITY_CONFIG.cookie.refresh.name];
     if (rawRefresh) {
-      await this.auth.rotateRefreshToken(rawRefresh, user.id, {
-        ip: ctx.req.ip,
-      });
+      // revoke only this refresh token
+      await this.auth.revokeRefreshToken(rawRefresh, user.id);
     } else {
       await this.auth.revokeAllForUser(user.id);
     }
