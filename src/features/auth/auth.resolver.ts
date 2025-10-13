@@ -2,9 +2,8 @@ import { Resolver, Mutation, Args, Context } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Tokens } from './dto/tokens.object';
-import { GqlAuthGuard } from '@/security/guards/gql-auth.guard';
+import { GqlAuthGuard } from '@/common/security/guards/gql-auth.guard';
 import { SECURITY_CONFIG } from '@/config/security.config';
-
 @Resolver()
 export class AuthResolver {
   constructor(private auth: AuthService) {}
@@ -33,10 +32,11 @@ export class AuthResolver {
 
   @Mutation(() => Tokens)
   async refresh(@Context() ctx: any): Promise<Tokens> {
-    const rawRefresh = ctx.req.cookies?.[SECURITY_CONFIG.cookie.refresh.name];
-    if (!rawRefresh) throw new Error('No refresh token');
+    const rawRefreshToken =
+      ctx.req.cookies?.[SECURITY_CONFIG.cookie.refresh.name];
+    if (!rawRefreshToken) throw new Error('No refresh token');
 
-    const accessToken = await this.auth.useRefreshToken(rawRefresh);
+    const accessToken = await this.auth.useRefreshToken(rawRefreshToken);
     if (!accessToken) throw new Error('Invalid refresh token');
 
     return { accessToken };
@@ -46,10 +46,11 @@ export class AuthResolver {
   @Mutation(() => Boolean)
   async logout(@Context() ctx: any) {
     const user = ctx.req.user;
-    const rawRefresh = ctx.req.cookies?.[SECURITY_CONFIG.cookie.refresh.name];
-    if (rawRefresh) {
+    const rawRefreshToken =
+      ctx.req.cookies?.[SECURITY_CONFIG.cookie.refresh.name];
+    if (rawRefreshToken) {
       // revoke only this refresh token
-      await this.auth.revokeRefreshToken(rawRefresh, user.id);
+      await this.auth.revokeRefreshToken(rawRefreshToken, user.id);
     } else {
       await this.auth.revokeAllForUser(user.id);
     }

@@ -5,7 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthResolver } from './auth.resolver';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { JwtStrategy } from './jwt.strategy';
-import { UsersModule } from '@/user/users.module';
+import { UsersModule } from '@/features/user/users.module';
 
 @Module({
   imports: [

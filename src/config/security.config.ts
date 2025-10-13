@@ -7,7 +7,7 @@ export const SECURITY_CONFIG = {
   },
   cookie: {
     refresh: {
-      name: '__Host-refreshToken',
+      name: 'refreshToken',
       options: {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
