@@ -22,6 +22,25 @@ export class AppResolver {
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'schema.gql'), // auto-generate schema in project root
       context: ({ req, res }) => ({ req, res }),
+      formatError: (error) => {
+        const isProduction = process.env.NODE_ENV === 'production';
+        if (isProduction) {
+          const { message, extensions } = error as any;
+
+          const safeExtensions: Record<string, any> = {};
+          if (extensions?.statusCode)
+            safeExtensions.statusCode = extensions.statusCode;
+          if (extensions?.errorType)
+            safeExtensions.errorType = extensions.errorType;
+
+          return { message, extensions: safeExtensions };
+        } else {
+          // In development, return the error object as is (or use a simple default)
+          // This ensures you see the full stack trace, path, etc., for debugging.
+          return error;
+        }
+      },
+
       playground: process.env.NODE_ENV !== 'production',
       csrfPrevention: process.env.NODE_ENV !== 'production',
       introspection: process.env.NODE_ENV !== 'production',

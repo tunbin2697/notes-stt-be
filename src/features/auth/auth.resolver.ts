@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { Tokens } from './dto/tokens.object';
 import { GqlAuthGuard } from '@/common/security/guards/gql-auth.guard';
 import { SECURITY_CONFIG } from '@/config/security.config';
+import { BusinessRuleException } from '@/common/exceptions/business-rule.exception';
 @Resolver()
 export class AuthResolver {
   constructor(private auth: AuthService) {}
@@ -15,7 +16,7 @@ export class AuthResolver {
     @Context() ctx: any,
   ): Promise<Tokens> {
     const user = await this.auth.validateUser(email, password);
-    if (!user) throw new Error('Invalid credentials');
+    if (!user) throw new BusinessRuleException('Invalid credentials');
 
     const accessToken = this.auth.signAccessToken(user.id);
     const refreshToken = await this.auth.signRefreshToken(user.id);
@@ -34,10 +35,10 @@ export class AuthResolver {
   async refresh(@Context() ctx: any): Promise<Tokens> {
     const rawRefreshToken =
       ctx.req.cookies?.[SECURITY_CONFIG.cookie.refresh.name];
-    if (!rawRefreshToken) throw new Error('No refresh token');
+    if (!rawRefreshToken) throw new BusinessRuleException('No refresh token');
 
     const accessToken = await this.auth.useRefreshToken(rawRefreshToken);
-    if (!accessToken) throw new Error('Invalid refresh token');
+    if (!accessToken) throw new BusinessRuleException('Invalid refresh token');
 
     return { accessToken };
   }

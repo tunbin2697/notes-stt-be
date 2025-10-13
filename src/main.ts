@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@/app.module';
 import cookieParser from 'cookie-parser';
 import { SECURITY_CONFIG } from '@/config/security.config';
+import { GraphQLExceptionFilter } from '@/common/filters/graphql-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -21,10 +22,12 @@ async function bootstrap() {
       if (whitelist.includes(origin)) return callback(null, true);
       return callback(new Error('CORS policy: origin not allowed'), false);
     },
-    credentials: true, // required to send/receive httpOnly cookies from browser
+    credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   });
+
+  app.useGlobalFilters(new GraphQLExceptionFilter());
 
   await app.listen(process.env.PORT ?? 3000);
 }
