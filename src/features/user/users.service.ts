@@ -33,22 +33,19 @@ export class UsersService {
       bio?: string;
     },
   ) {
-    // Check if profile exists
-    const existingProfile = await (this.prisma as any).profile.findUnique({
-      where: { accountId },
-    });
-
-    if (!existingProfile) {
-      throw new BusinessRuleException('Profile not found');
+    try {
+      await this.prisma.profile.update({
+        where: { accountId },
+        data: data,
+        include: { account: { select: { email: true, role: true } } },
+      });
+    } catch (e) {
+      // Check for the specific Prisma error when a record is not found
+      if (e.code === 'P2025' || e.name === 'NotFoundError') {
+        throw new BusinessRuleException('Profile not found');
+      }
+      // Re-throw other errors
+      throw e;
     }
-
-    // Update profile
-    const updatedProfile = await (this.prisma as any).profile.update({
-      where: { accountId },
-      data,
-      include: { account: { select: { email: true, role: true } } },
-    });
-
-    return updatedProfile;
   }
 }

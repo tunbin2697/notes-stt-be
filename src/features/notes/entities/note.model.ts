@@ -1,26 +1,7 @@
 import { ObjectType, Field, Int, registerEnumType } from '@nestjs/graphql';
-
-// Enums for GraphQL
-export enum NoteType {
-  NOTE = 'NOTE',
-  TASK = 'TASK',
-  TODO = 'TODO',
-  REMINDER = 'REMINDER',
-}
-
-export enum NotePriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  URGENT = 'URGENT',
-}
-
-export enum NoteStatus {
-  PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-}
+import { NoteType } from '../../../enums/NoteType';
+import { NotePriority } from '../../../enums/NotePriority';
+import { NoteStatus } from '../../../enums/NoteStatus';
 
 // Register enums with GraphQL
 registerEnumType(NoteType, {

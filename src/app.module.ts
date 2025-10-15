@@ -27,8 +27,7 @@ export class AppResolver {
       autoSchemaFile: join(process.cwd(), 'schema.gql'), // auto-generate schema in project root
       context: ({ req, res }) => ({ req, res }),
       formatError: (error) => {
-        const isProduction = true; //temporary hardcode to true
-        // const isProduction = process.env.NODE_ENV === 'production';
+        const isProduction = process.env.NODE_ENV === 'production';
         if (isProduction) {
           const { message, extensions } = error as any;
 

@@ -1,5 +1,7 @@
 import { InputType, Field } from '@nestjs/graphql';
-import { NoteType, NotePriority, NoteStatus } from '../entities/note.model';
+import { NoteType } from '../../../enums/NoteType';
+import { NotePriority } from '../../../enums/NotePriority';
+import { NoteStatus } from '../../../enums/NoteStatus';
 
 @InputType()
 export class UpdateNoteInput {

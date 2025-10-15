@@ -23,4 +23,11 @@ export const SECURITY_CONFIG = {
   auth: {
     maxDevices: Number(process.env.MAX_DEVICES) || 3,
   },
+  password: {
+    // Regex must be defined as a string for configuration
+    REGEX_PATTERN: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$',
+    // Note: Escaped backslashes are necessary when defining a regex as a string.
+    MIN_LENGTH: 8,
+    MESSAGE: 'Password must contain uppercase, lowercase, and a number.',
+  },
 };

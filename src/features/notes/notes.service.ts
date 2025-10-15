@@ -3,7 +3,8 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { BusinessRuleException } from '@/common/exceptions/business-rule.exception';
 import { CreateNoteInput } from './dto/create-note.input';
 import { UpdateNoteInput } from './dto/update-note.input';
-import { NoteType, NoteStatus } from './entities/note.model';
+import { NoteType } from '../../enums/NoteType';
+import { NoteStatus } from '../../enums/NoteStatus';
 
 @Injectable()
 export class NotesService {
@@ -27,6 +28,11 @@ export class NotesService {
       isPinned?: boolean;
       tags?: string[];
     },
+    pagination?: {
+      limit?: number;
+      offset?: number;
+      cursor?: number;
+    },
   ) {
     const where: any = { profileId };
 
@@ -39,14 +45,53 @@ export class NotesService {
       where.tags = { hasSome: filters.tags };
     }
 
-    return await (this.prisma as any).note.findMany({
+    const orderBy = [
+      { isPinned: 'desc' },
+      { dueDate: 'asc' },
+      { updatedAt: 'desc' },
+    ];
+
+    // Cursor-based pagination (preferred for real-time data)
+    if (pagination?.cursor) {
+      where.id = { lt: pagination.cursor };
+    }
+
+    const limit = pagination?.limit || 20;
+    const offset = pagination?.offset || 0;
+
+    // Get total count for pagination info
+    const totalCount = await (this.prisma as any).note.count({ where });
+
+    // Fetch notes with pagination
+    const notes = await (this.prisma as any).note.findMany({
       where,
-      orderBy: [
-        { isPinned: 'desc' },
-        { dueDate: 'asc' },
-        { updatedAt: 'desc' },
-      ],
+      orderBy,
+      take: limit + 1, // Fetch one extra to check if there are more
+      skip: pagination?.cursor ? 0 : offset,
     });
+
+    // Check if there are more results
+    const hasMore = notes.length > limit;
+    if (hasMore) {
+      notes.pop(); // Remove the extra item
+    }
+
+    // Get next cursor (ID of last item)
+    const nextCursor =
+      hasMore && notes.length > 0 ? notes[notes.length - 1].id : null;
+
+    return {
+      nodes: notes,
+      totalCount,
+      hasMore,
+      nextCursor,
+      pageInfo: {
+        limit,
+        offset,
+        currentPage: Math.floor(offset / limit) + 1,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    };
   }
 
   async findOne(id: number, profileId: number) {
@@ -129,54 +174,130 @@ export class NotesService {
   }
 
   // Get upcoming tasks/todos (due within next 7 days)
-  async getUpcoming(profileId: number) {
+  async getUpcoming(
+    profileId: number,
+    pagination?: { limit?: number; offset?: number },
+  ) {
     const now = new Date();
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
 
-    return await (this.prisma as any).note.findMany({
-      where: {
-        profileId,
-        isArchived: false,
-        status: { not: NoteStatus.COMPLETED },
-        dueDate: {
-          gte: now,
-          lte: nextWeek,
-        },
+    const where = {
+      profileId,
+      isArchived: false,
+      status: { not: NoteStatus.COMPLETED },
+      dueDate: {
+        gte: now,
+        lte: nextWeek,
       },
-      orderBy: { dueDate: 'asc' },
-    });
+    };
+
+    const limit = pagination?.limit || 20;
+    const offset = pagination?.offset || 0;
+
+    const [totalCount, notes] = await Promise.all([
+      (this.prisma as any).note.count({ where }),
+      (this.prisma as any).note.findMany({
+        where,
+        orderBy: { dueDate: 'asc' },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
+
+    return {
+      nodes: notes,
+      totalCount,
+      hasMore: offset + notes.length < totalCount,
+      pageInfo: {
+        limit,
+        offset,
+        currentPage: Math.floor(offset / limit) + 1,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    };
   }
 
   // Get overdue tasks/todos
-  async getOverdue(profileId: number) {
+  async getOverdue(
+    profileId: number,
+    pagination?: { limit?: number; offset?: number },
+  ) {
     const now = new Date();
 
-    return await (this.prisma as any).note.findMany({
-      where: {
-        profileId,
-        isArchived: false,
-        status: { not: NoteStatus.COMPLETED },
-        dueDate: {
-          lt: now,
-        },
+    const where = {
+      profileId,
+      isArchived: false,
+      status: { not: NoteStatus.COMPLETED },
+      dueDate: {
+        lt: now,
       },
-      orderBy: { dueDate: 'asc' },
-    });
+    };
+
+    const limit = pagination?.limit || 20;
+    const offset = pagination?.offset || 0;
+
+    const [totalCount, notes] = await Promise.all([
+      (this.prisma as any).note.count({ where }),
+      (this.prisma as any).note.findMany({
+        where,
+        orderBy: { dueDate: 'asc' },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
+
+    return {
+      nodes: notes,
+      totalCount,
+      hasMore: offset + notes.length < totalCount,
+      pageInfo: {
+        limit,
+        offset,
+        currentPage: Math.floor(offset / limit) + 1,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    };
   }
 
   // Search notes by title or content
-  async searchNotes(profileId: number, query: string) {
-    return await (this.prisma as any).note.findMany({
-      where: {
-        profileId,
-        isArchived: false,
-        OR: [
-          { title: { contains: query, mode: 'insensitive' } },
-          { content: { contains: query, mode: 'insensitive' } },
-        ],
+  async searchNotes(
+    profileId: number,
+    query: string,
+    pagination?: { limit?: number; offset?: number },
+  ) {
+    const where = {
+      profileId,
+      isArchived: false,
+      OR: [
+        { title: { contains: query, mode: 'insensitive' } },
+        { content: { contains: query, mode: 'insensitive' } },
+      ],
+    };
+
+    const limit = pagination?.limit || 20;
+    const offset = pagination?.offset || 0;
+
+    const [totalCount, notes] = await Promise.all([
+      (this.prisma as any).note.count({ where }),
+      (this.prisma as any).note.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
+
+    return {
+      nodes: notes,
+      totalCount,
+      hasMore: offset + notes.length < totalCount,
+      pageInfo: {
+        limit,
+        offset,
+        currentPage: Math.floor(offset / limit) + 1,
+        totalPages: Math.ceil(totalCount / limit),
       },
-      orderBy: { updatedAt: 'desc' },
-    });
+    };
   }
 }

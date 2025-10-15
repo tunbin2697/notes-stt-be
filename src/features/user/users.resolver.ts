@@ -29,8 +29,18 @@ export class UsersResolver {
     @Context() ctx: any,
   ): Promise<Boolean> {
     const accountId = ctx.req.user.id;
-    const updatedProfile = await this.users.updateProfile(accountId, input);
 
+    // Debug logging
+    console.log('=== UPDATE PROFILE DEBUG ===');
+    console.log('Account ID:', accountId);
+    console.log('Input received:', JSON.stringify(input, null, 2));
+    console.log('Input keys:', Object.keys(input));
+    console.log('Input values:', Object.values(input));
+    console.log('===========================');
+
+    await this.users.updateProfile(accountId, input);
+
+    // Map null values to undefined for GraphQL
     return true;
   }
 }

@@ -67,19 +67,34 @@ enum NotePriority {
   URGENT
 }
 
+type PageInfo {
+  limit: Int!
+  offset: Int!
+  currentPage: Int!
+  totalPages: Int!
+}
+
+type PaginatedNotes {
+  nodes: [Note!]!
+  totalCount: Int!
+  hasMore: Boolean!
+  nextCursor: Int
+  pageInfo: PageInfo!
+}
+
 type Query {
   health: String!
   getMyProfile: Profile!
-  getMyNotes(type: NoteType, status: NoteStatus, isArchived: Boolean, isPinned: Boolean, tags: [String!]): [Note!]!
+  getMyNotes(limit: Int = 20, offset: Int = 0, cursor: Int, type: NoteType, status: NoteStatus, isArchived: Boolean, isPinned: Boolean, tags: [String!]): PaginatedNotes!
   getNote(id: Int!): Note!
-  getUpcomingNotes: [Note!]!
-  getOverdueNotes: [Note!]!
-  searchNotes(query: String!): [Note!]!
+  getUpcomingNotes(limit: Int = 20, offset: Int = 0, cursor: Int): PaginatedNotes!
+  getOverdueNotes(limit: Int = 20, offset: Int = 0, cursor: Int): PaginatedNotes!
+  searchNotes(query: String!, limit: Int = 20, offset: Int = 0, cursor: Int): PaginatedNotes!
 }
 
 type Mutation {
   register(email: String!, password: String!): Boolean!
-  login(email: String!, password: String!): Tokens!
+  login(input: LoginInput!): Tokens!
   refresh: Tokens!
   logout: Boolean!
   changePassword(input: ChangePasswordInput!): Boolean!
@@ -95,6 +110,11 @@ type Mutation {
   unpinNote(id: Int!): Note!
   completeTask(id: Int!): Note!
   uncompleteTask(id: Int!): Note!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
 }
 
 input ChangePasswordInput {

@@ -7,41 +7,53 @@ import {
 import { GqlExceptionFilter, GqlExecutionContext } from '@nestjs/graphql';
 import { GraphQLError } from 'graphql';
 import { BusinessRuleException } from '../exceptions/business-rule.exception';
+// ... (imports remain the same)
+import { Logger } from '@nestjs/common'; // Import NestJS Logger
 
-/**
- * Global filter to catch exceptions thrown from the service layer and
- * format them into a standardized, client-friendly GraphQL error response.
- */
 @Catch()
 export class GraphQLExceptionFilter implements GqlExceptionFilter {
+  private readonly logger = new Logger(GraphQLExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     let status: HttpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string = 'An unexpected server error occurred.';
-    let errorType: string = 'InternalServerError';
+    let errorType: string = 'INTERNAL_SERVER_ERROR'; // Use uppercase for convention
 
-    // 1. Intercept Business Rule Exceptions (The error we created)
     if (exception instanceof BusinessRuleException) {
-      status = HttpStatus.BAD_REQUEST;
+      status = HttpStatus.BAD_REQUEST; // or 422 UNPROCESSABLE_ENTITY
       message = exception.message;
-      errorType = 'BusinessRuleViolation'; // Custom code for client-side logic
-    }
-    // 2. Intercept Standard NestJS HTTP Exceptions (e.g., from Guards)
-    else if (exception instanceof HttpException) {
+      errorType = 'BUSINESS_RULE_VIOLATION'; // Consistent uppercase code
+    } else if (exception instanceof HttpException) {
       status = exception.getStatus();
-
-      // Handle the HttpException's response body, which can be an object or string
       const response = exception.getResponse();
+
+      // Extract the message and standardize the errorType code
       message =
         typeof response === 'string'
           ? response
           : (response as any).message || exception.message;
-      errorType = exception.name;
+      errorType = HttpStatus[status] || 'HTTP_EXCEPTION'; // e.g., "UNAUTHORIZED" or "NOT_FOUND"
+
+      // Log non-5xx exceptions as warnings or info
+      if (status >= 500) {
+        this.logger.error(message, (exception as Error).stack);
+      }
+    } else {
+      // Catch-all for truly unknown errors (e.g., database connection issues)
+      this.logger.error(
+        'Caught unknown exception:',
+        (exception as Error).stack,
+      );
+
+      // For security, keep the message generic for the client
+      status = HttpStatus.INTERNAL_SERVER_ERROR;
+      message = 'A critical server error occurred.';
+      errorType = 'INTERNAL_SERVER_ERROR';
     }
 
-    // Only include the minimal fields requested by the frontend.
     const extensions: Record<string, any> = {
       statusCode: status,
-      errorType,
+      code: errorType, // Using 'code' is standard in GraphQL extensions
     };
 
     return new GraphQLError(message, { extensions });

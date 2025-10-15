@@ -1,9 +1,12 @@
 import { Resolver, Query, Mutation, Args, Context, Int } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { NotesService } from './notes.service';
-import { Note, NoteType, NoteStatus } from './entities/note.model';
+import { Note } from './entities/note.model';
+import { PaginatedNotes } from './entities/paginated-notes.object';
 import { CreateNoteInput } from './dto/create-note.input';
 import { UpdateNoteInput } from './dto/update-note.input';
+import { PaginationArgs } from './dto/pagination.args';
+import { NotesFilterArgs } from './dto/notes-filter.args';
 import { GqlAuthGuard } from '@/common/security/guards/gql-auth.guard';
 
 @Resolver(() => Note)
@@ -20,26 +23,28 @@ export class NotesResolver {
     return await this.notes.createNote(profileId, input);
   }
 
-  @Query(() => [Note])
+  @Query(() => PaginatedNotes)
   async getMyNotes(
     @Context() ctx: any,
-    @Args('type', { type: () => NoteType, nullable: true }) type?: NoteType,
-    @Args('status', { type: () => NoteStatus, nullable: true })
-    status?: NoteStatus,
-    @Args('isArchived', { type: () => Boolean, nullable: true })
-    isArchived?: boolean,
-    @Args('isPinned', { type: () => Boolean, nullable: true })
-    isPinned?: boolean,
-    @Args('tags', { type: () => [String], nullable: true }) tags?: string[],
-  ): Promise<Note[]> {
+    @Args() pagination: PaginationArgs,
+    @Args() filters: NotesFilterArgs,
+  ): Promise<PaginatedNotes> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.findAllByProfile(profileId, {
-      type,
-      status,
-      isArchived,
-      isPinned,
-      tags,
-    });
+    return await this.notes.findAllByProfile(
+      profileId,
+      {
+        type: filters.type,
+        status: filters.status,
+        isArchived: filters.isArchived,
+        isPinned: filters.isPinned,
+        tags: filters.tags,
+      },
+      {
+        limit: pagination.limit,
+        offset: pagination.offset,
+        cursor: pagination.cursor,
+      },
+    );
   }
 
   @Query(() => Note)
@@ -51,25 +56,41 @@ export class NotesResolver {
     return await this.notes.findOne(id, profileId);
   }
 
-  @Query(() => [Note])
-  async getUpcomingNotes(@Context() ctx: any): Promise<Note[]> {
+  @Query(() => PaginatedNotes)
+  async getUpcomingNotes(
+    @Context() ctx: any,
+    @Args() pagination: PaginationArgs,
+  ): Promise<PaginatedNotes> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.getUpcoming(profileId);
+    return await this.notes.getUpcoming(profileId, {
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
   }
 
-  @Query(() => [Note])
-  async getOverdueNotes(@Context() ctx: any): Promise<Note[]> {
+  @Query(() => PaginatedNotes)
+  async getOverdueNotes(
+    @Context() ctx: any,
+    @Args() pagination: PaginationArgs,
+  ): Promise<PaginatedNotes> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.getOverdue(profileId);
+    return await this.notes.getOverdue(profileId, {
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
   }
 
-  @Query(() => [Note])
+  @Query(() => PaginatedNotes)
   async searchNotes(
     @Args('query') query: string,
     @Context() ctx: any,
-  ): Promise<Note[]> {
+    @Args() pagination: PaginationArgs,
+  ): Promise<PaginatedNotes> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.searchNotes(profileId, query);
+    return await this.notes.searchNotes(profileId, query, {
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
   }
 
   @Mutation(() => Note)

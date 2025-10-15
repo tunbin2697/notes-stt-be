@@ -7,6 +7,7 @@ import { SECURITY_CONFIG } from '@/config/security.config';
 import { BusinessRuleException } from '@/common/exceptions/business-rule.exception';
 import { ChangePasswordInput } from './dto/change-password.input';
 import { ResetPasswordInput } from './dto/reset-password.input';
+import { LoginInput } from './dto/login.input';
 @Resolver()
 export class AuthResolver {
   constructor(private auth: AuthService) {}
@@ -25,11 +26,10 @@ export class AuthResolver {
 
   @Mutation(() => Tokens)
   async login(
-    @Args('email') email: string,
-    @Args('password') password: string,
+    @Args('input') input: LoginInput,
     @Context() ctx: any,
   ): Promise<Tokens> {
-    const user = await this.auth.validateUser(email, password);
+    const user = await this.auth.validateUser(input.email, input.password);
     if (!user) throw new BusinessRuleException('Invalid credentials');
 
     const accessToken = this.auth.signAccessToken(user.id);
