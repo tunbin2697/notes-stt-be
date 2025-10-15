@@ -3,13 +3,52 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { SECURITY_CONFIG } from '@/config/security.config';
+import { BusinessRuleException } from '@/common/exceptions/business-rule.exception';
+import { EmailService } from '@/common/services/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private email: EmailService,
   ) {}
+
+  async register(email: string, password: string) {
+    const existing = await (this.prisma as any).account.findUnique({
+      where: { email },
+    });
+    if (existing) {
+      throw new BusinessRuleException('Account with this email already exists');
+    }
+
+    // Create account and profile in a transaction
+    const user = await this.prisma.$transaction(async (tx) => {
+      // Create account
+      const hashed = await bcrypt.hash(password, 10);
+      const account = await (tx as any).account.create({
+        data: { email, password: hashed },
+      });
+
+      // Create profile for the account
+      await (tx as any).profile.create({
+        data: {
+          accountId: account.id,
+          fullName: null,
+          phone: null,
+          location: null,
+          avatar: null,
+          bio: null,
+        },
+      });
+
+      return account;
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _p, ...safe } = user as any;
+    return safe;
+  }
 
   async validateUser(email: string, password: string) {
     const user = await (this.prisma as any).account.findUnique({
@@ -48,7 +87,7 @@ export class AuthService {
     });
 
     if (activeCount >= MAX_DEVICES) {
-      throw new ForbiddenException('Maximum active devices reached');
+      throw new BusinessRuleException('Maximum active devices reached');
     }
 
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -101,6 +140,7 @@ export class AuthService {
     for (const t of tokens) {
       const match = await bcrypt.compare(oldRawToken, t.token);
       if (match) {
+        console.log('revoking token id:', t.id);
         await this.prisma.refreshToken.update({
           where: { id: t.id },
           data: { revoked: true },
@@ -108,7 +148,7 @@ export class AuthService {
         return true;
       }
     }
-    return false;
+    throw new BusinessRuleException('Refresh token not found');
   }
 
   async revokeAllForUser(accountId: number) {
@@ -116,5 +156,149 @@ export class AuthService {
       where: { accountId } as any,
       data: { revoked: true },
     });
+  }
+
+  /**
+   * Change password for authenticated user
+   */
+  async changePassword(
+    accountId: number,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    // Get user account
+    const account = await (this.prisma as any).account.findUnique({
+      where: { id: accountId },
+    });
+
+    if (!account) {
+      throw new BusinessRuleException('Account not found');
+    }
+
+    // Verify current password
+    const isValid = await bcrypt.compare(currentPassword, account.password);
+    if (!isValid) {
+      throw new BusinessRuleException('Current password is incorrect');
+    }
+
+    // Validate new password is different
+    if (currentPassword === newPassword) {
+      throw new BusinessRuleException(
+        'New password must be different from current password',
+      );
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await (this.prisma as any).account.update({
+      where: { id: accountId },
+      data: { password: hashedNewPassword },
+    });
+
+    // Send notification email (mock)
+    await this.email.sendPasswordChangedNotification(account.email);
+
+    // Revoke all refresh tokens for security
+    await this.revokeAllForUser(accountId);
+  }
+
+  /**
+   * Request password reset - sends OTP to email
+   */
+  async forgotPassword(email: string): Promise<void> {
+    // Check if account exists
+    const account = await (this.prisma as any).account.findUnique({
+      where: { email },
+    });
+
+    if (!account) {
+      // For security, don't reveal if email exists or not
+      // Just return success
+      return;
+    }
+
+    // Generate OTP
+    const otp = this.email.generateOTP();
+
+    // Store OTP in database (expires in 10 minutes)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Invalidate any existing unused password reset tokens for this account
+    await (this.prisma as any).passwordReset.updateMany({
+      where: { accountId: account.id, used: false } as any,
+      data: { used: true },
+    });
+
+    // Create new password reset token
+    await (this.prisma as any).passwordReset.create({
+      data: {
+        token: otp,
+        accountId: account.id,
+        expiresAt,
+      },
+    });
+
+    // Send OTP via email (mock - logs to console)
+    await this.email.sendPasswordResetOTP(email, otp);
+  }
+
+  /**
+   * Reset password using OTP
+   */
+  async resetPassword(
+    email: string,
+    otp: string,
+    newPassword: string,
+  ): Promise<void> {
+    // Find account
+    const account = await (this.prisma as any).account.findUnique({
+      where: { email },
+    });
+
+    if (!account) {
+      throw new BusinessRuleException('Invalid reset code');
+    }
+
+    // Find valid password reset token
+    const resetToken = await (this.prisma as any).passwordReset.findFirst({
+      where: {
+        accountId: account.id,
+        token: otp,
+        used: false,
+        expiresAt: { gt: new Date() },
+      } as any,
+    });
+
+    if (!resetToken) {
+      throw new BusinessRuleException(
+        'Invalid or expired reset code. Please request a new one.',
+      );
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password and mark token as used
+    await this.prisma.$transaction(async (tx) => {
+      // Update password
+      await (tx as any).account.update({
+        where: { id: account.id },
+        data: { password: hashedPassword },
+      });
+
+      // Mark token as used
+      await (tx as any).passwordReset.update({
+        where: { id: resetToken.id },
+        data: { used: true },
+      });
+    });
+
+    // Send notification email (mock)
+    await this.email.sendPasswordChangedNotification(email);
+
+    // Revoke all refresh tokens for security
+    await this.revokeAllForUser(account.id);
   }
 }

@@ -19,24 +19,60 @@ enum Role {
 }
 
 model Account {
-  id            Int            @id @default(autoincrement())
-  email         String         @unique
-  password      String?
-  provider      String         @default("native")
-  providerId    String?
-  role          Role           @default(USER)
-  refreshTokens RefreshToken[]
-  profile       Profile?
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  password       String?
+  provider       String          @default("native")
+  providerId     String?
+  role           Role            @default(USER)
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordReset[]
+  profile        Profile?
+}
+
+enum NoteType {
+  NOTE // Regular note
+  TASK // Scheduled task
+  TODO // Todo list item
+  REMINDER // Reminder
+}
+
+enum NotePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NoteStatus {
+  PENDING // Not started
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 model Note {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  profileId Int
-  profile   Profile  @relation(fields: [profileId], references: [id])
+  id          Int          @id @default(autoincrement())
+  title       String
+  content     String       @db.Text
+  type        NoteType     @default(NOTE)
+  status      NoteStatus   @default(PENDING)
+  priority    NotePriority @default(MEDIUM)
+  dueDate     DateTime? // For tasks and reminders
+  completedAt DateTime? // When task/todo was completed
+  tags        String[]     @default([]) // Array of tags for categorization
+  color       String? // Hex color for UI customization
+  isPinned    Boolean      @default(false)
+  isArchived  Boolean      @default(false)
+  profileId   Int
+  profile     Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([profileId])
+  @@index([type])
+  @@index([status])
+  @@index([dueDate])
 }
 
 model RefreshToken {
@@ -64,4 +100,17 @@ model Profile {
   bio       String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique // OTP code (6 digits)
+  accountId Int
+  account   Account  @relation(fields: [accountId], references: [id])
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([accountId])
+  @@index([token])
 }

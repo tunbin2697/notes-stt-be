@@ -4,6 +4,8 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
 import { Resolver, Query } from '@nestjs/graphql';
 import { AuthModule } from './features/auth/auth.module';
+import { UsersModule } from './features/user/users.module';
+import { NotesModule } from './features/notes/notes.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 
 @Resolver()
@@ -18,12 +20,15 @@ export class AppResolver {
   imports: [
     PrismaModule,
     AuthModule,
+    UsersModule,
+    NotesModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'schema.gql'), // auto-generate schema in project root
       context: ({ req, res }) => ({ req, res }),
       formatError: (error) => {
-        const isProduction = process.env.NODE_ENV === 'production';
+        const isProduction = true; //temporary hardcode to true
+        // const isProduction = process.env.NODE_ENV === 'production';
         if (isProduction) {
           const { message, extensions } = error as any;
 
@@ -46,6 +51,6 @@ export class AppResolver {
       introspection: process.env.NODE_ENV !== 'production',
     }),
   ],
-  providers: [AppResolver], // Minimal setup
+  providers: [AppResolver],
 })
 export class AppModule {}

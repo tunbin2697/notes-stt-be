@@ -6,13 +6,138 @@ type Tokens {
   accessToken: String!
 }
 
+type Profile {
+  id: Int!
+  accountId: Int!
+  fullName: String
+  phone: String
+  location: String
+  avatar: String
+  bio: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  email: String
+  role: String
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Note {
+  id: Int!
+  title: String!
+  content: String!
+  type: NoteType!
+  status: NoteStatus!
+  priority: NotePriority!
+  dueDate: DateTime
+  completedAt: DateTime
+  tags: [String!]!
+  color: String
+  isPinned: Boolean!
+  isArchived: Boolean!
+  profileId: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""Type of note: NOTE, TASK, TODO, or REMINDER"""
+enum NoteType {
+  NOTE
+  TASK
+  TODO
+  REMINDER
+}
+
+"""Status of task/todo"""
+enum NoteStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+"""Priority level of the note"""
+enum NotePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 type Query {
   health: String!
+  getMyProfile: Profile!
+  getMyNotes(type: NoteType, status: NoteStatus, isArchived: Boolean, isPinned: Boolean, tags: [String!]): [Note!]!
+  getNote(id: Int!): Note!
+  getUpcomingNotes: [Note!]!
+  getOverdueNotes: [Note!]!
+  searchNotes(query: String!): [Note!]!
 }
 
 type Mutation {
+  register(email: String!, password: String!): Boolean!
   login(email: String!, password: String!): Tokens!
   refresh: Tokens!
   logout: Boolean!
-  register(email: String!, password: String!): Boolean!
+  changePassword(input: ChangePasswordInput!): Boolean!
+  forgotPassword(email: String!): Boolean!
+  resetPassword(input: ResetPasswordInput!): Boolean!
+  updateMyProfile(input: UpdateProfileInput!): Boolean!
+  createNote(input: CreateNoteInput!): Note!
+  updateNote(id: Int!, input: UpdateNoteInput!): Note!
+  deleteNote(id: Int!): Boolean!
+  archiveNote(id: Int!): Note!
+  unarchiveNote(id: Int!): Note!
+  pinNote(id: Int!): Note!
+  unpinNote(id: Int!): Note!
+  completeTask(id: Int!): Note!
+  uncompleteTask(id: Int!): Note!
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+input ResetPasswordInput {
+  email: String!
+  otp: String!
+  newPassword: String!
+}
+
+input UpdateProfileInput {
+  fullName: String
+  phone: String
+  location: String
+  avatar: String
+  bio: String
+}
+
+input CreateNoteInput {
+  title: String!
+  content: String!
+  type: NoteType! = NOTE
+  status: NoteStatus! = PENDING
+  priority: NotePriority! = MEDIUM
+  dueDate: DateTime
+  tags: [String!]! = []
+  color: String
+  isPinned: Boolean! = false
+}
+
+input UpdateNoteInput {
+  title: String
+  content: String
+  type: NoteType
+  status: NoteStatus
+  priority: NotePriority
+  dueDate: DateTime
+  completedAt: DateTime
+  tags: [String!]
+  color: String
+  isPinned: Boolean
+  isArchived: Boolean
 }

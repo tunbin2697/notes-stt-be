@@ -6,6 +6,7 @@ import { AuthResolver } from './auth.resolver';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { JwtStrategy } from '../../common/security/strategies/jwt.strategy';
 import { UsersModule } from '@/features/user/users.module';
+import { EmailService } from '@/common/services/email.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { UsersModule } from '@/features/user/users.module';
       signOptions: { expiresIn: '30m' },
     }),
   ],
-  providers: [AuthService, AuthResolver, JwtStrategy],
+  providers: [AuthService, AuthResolver, JwtStrategy, EmailService],
   exports: [AuthService],
 })
 export class AuthModule {}

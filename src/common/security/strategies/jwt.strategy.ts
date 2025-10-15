@@ -27,8 +27,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       },
     });
     if (!account) return null;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _p, ...safe } = account as any;
-    return safe;
+
+    // Add profileId to the user object for easy access
+    const user = {
+      id: account.id,
+      email: account.email,
+      role: account.role,
+      profileId: account.profile?.id,
+      profile: account.profile,
+    };
+
+    return user;
   }
 }

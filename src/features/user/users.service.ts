@@ -1,30 +1,54 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import * as bcrypt from 'bcrypt';
+import { BusinessRuleException } from '@/common/exceptions/business-rule.exception';
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async createUser(email: string, password: string) {
-    // check existing account first
-    const existing = await (this.prisma as any).account.findUnique({
-      where: { email },
-    });
-    if (existing) {
-      throw new ConflictException('Account with this email already exists');
-    }
-
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await (this.prisma as any).account.create({
-      data: { email, password: hashed },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _p, ...safe } = user as any;
-    return safe;
-  }
-
   async findById(id: number) {
     return (this.prisma as any).account.findUnique({ where: { id } });
+  }
+
+  async findProfileByAccountId(accountId: number) {
+    const profile = await (this.prisma as any).profile.findUnique({
+      where: { accountId },
+      include: { account: { select: { email: true, role: true } } },
+    });
+
+    if (!profile) {
+      throw new BusinessRuleException('Profile not found');
+    }
+
+    return profile;
+  }
+
+  async updateProfile(
+    accountId: number,
+    data: {
+      fullName?: string;
+      phone?: string;
+      location?: string;
+      avatar?: string;
+      bio?: string;
+    },
+  ) {
+    // Check if profile exists
+    const existingProfile = await (this.prisma as any).profile.findUnique({
+      where: { accountId },
+    });
+
+    if (!existingProfile) {
+      throw new BusinessRuleException('Profile not found');
+    }
+
+    // Update profile
+    const updatedProfile = await (this.prisma as any).profile.update({
+      where: { accountId },
+      data,
+      include: { account: { select: { email: true, role: true } } },
+    });
+
+    return updatedProfile;
   }
 }
