@@ -12,7 +12,7 @@ import { GqlAuthGuard } from '@/common/security/guards/gql-auth.guard';
 @Resolver(() => Note)
 @UseGuards(GqlAuthGuard)
 export class NotesResolver {
-  constructor(private notes: NotesService) {}
+  constructor(private notesService: NotesService) {}
 
   @Mutation(() => Note)
   async createNote(
@@ -20,17 +20,19 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.createNote(profileId, input);
+    return await this.notesService.createNote(profileId, input);
   }
 
-  @Query(() => PaginatedNotes)
-  async getMyNotes(
+  @Query(() => PaginatedNotes, {
+    description: 'Get notes with flexible filtering, pagination, and search',
+  })
+  async notes(
     @Context() ctx: any,
     @Args() pagination: PaginationArgs,
     @Args() filters: NotesFilterArgs,
   ): Promise<PaginatedNotes> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.findAllByProfile(
+    return await this.notesService.findAllByProfile(
       profileId,
       {
         type: filters.type,
@@ -38,6 +40,9 @@ export class NotesResolver {
         isArchived: filters.isArchived,
         isPinned: filters.isPinned,
         tags: filters.tags,
+        search: filters.search,
+        isUpcoming: filters.isUpcoming,
+        isOverdue: filters.isOverdue,
       },
       {
         limit: pagination.limit,
@@ -47,50 +52,15 @@ export class NotesResolver {
     );
   }
 
-  @Query(() => Note)
-  async getNote(
+  @Query(() => Note, {
+    description: 'Get a single note by ID',
+  })
+  async note(
     @Args('id', { type: () => Int }) id: number,
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.findOne(id, profileId);
-  }
-
-  @Query(() => PaginatedNotes)
-  async getUpcomingNotes(
-    @Context() ctx: any,
-    @Args() pagination: PaginationArgs,
-  ): Promise<PaginatedNotes> {
-    const profileId = ctx.req.user.profileId;
-    return await this.notes.getUpcoming(profileId, {
-      limit: pagination.limit,
-      offset: pagination.offset,
-    });
-  }
-
-  @Query(() => PaginatedNotes)
-  async getOverdueNotes(
-    @Context() ctx: any,
-    @Args() pagination: PaginationArgs,
-  ): Promise<PaginatedNotes> {
-    const profileId = ctx.req.user.profileId;
-    return await this.notes.getOverdue(profileId, {
-      limit: pagination.limit,
-      offset: pagination.offset,
-    });
-  }
-
-  @Query(() => PaginatedNotes)
-  async searchNotes(
-    @Args('query') query: string,
-    @Context() ctx: any,
-    @Args() pagination: PaginationArgs,
-  ): Promise<PaginatedNotes> {
-    const profileId = ctx.req.user.profileId;
-    return await this.notes.searchNotes(profileId, query, {
-      limit: pagination.limit,
-      offset: pagination.offset,
-    });
+    return await this.notesService.findOne(id, profileId);
   }
 
   @Mutation(() => Note)
@@ -100,7 +70,7 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.updateNote(id, profileId, input);
+    return await this.notesService.updateNote(id, profileId, input);
   }
 
   @Mutation(() => Boolean)
@@ -109,7 +79,7 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<boolean> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.deleteNote(id, profileId);
+    return await this.notesService.deleteNote(id, profileId);
   }
 
   @Mutation(() => Note)
@@ -118,7 +88,7 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.archiveNote(id, profileId);
+    return await this.notesService.archiveNote(id, profileId);
   }
 
   @Mutation(() => Note)
@@ -127,7 +97,7 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.unarchiveNote(id, profileId);
+    return await this.notesService.unarchiveNote(id, profileId);
   }
 
   @Mutation(() => Note)
@@ -136,7 +106,7 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.pinNote(id, profileId);
+    return await this.notesService.pinNote(id, profileId);
   }
 
   @Mutation(() => Note)
@@ -145,7 +115,7 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.unpinNote(id, profileId);
+    return await this.notesService.unpinNote(id, profileId);
   }
 
   @Mutation(() => Note)
@@ -154,7 +124,7 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.completeTask(id, profileId);
+    return await this.notesService.completeTask(id, profileId);
   }
 
   @Mutation(() => Note)
@@ -163,6 +133,6 @@ export class NotesResolver {
     @Context() ctx: any,
   ): Promise<Note> {
     const profileId = ctx.req.user.profileId;
-    return await this.notes.uncompleteTask(id, profileId);
+    return await this.notesService.uncompleteTask(id, profileId);
   }
 }

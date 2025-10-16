@@ -27,6 +27,9 @@ export class NotesService {
       isArchived?: boolean;
       isPinned?: boolean;
       tags?: string[];
+      search?: string;
+      isUpcoming?: boolean;
+      isOverdue?: boolean;
     },
     pagination?: {
       limit?: number;
@@ -36,13 +39,44 @@ export class NotesService {
   ) {
     const where: any = { profileId };
 
+    // Type and status filters
     if (filters?.type) where.type = filters.type;
     if (filters?.status) where.status = filters.status;
     if (filters?.isArchived !== undefined)
       where.isArchived = filters.isArchived;
     if (filters?.isPinned !== undefined) where.isPinned = filters.isPinned;
+
+    // Tags filter
     if (filters?.tags && filters.tags.length > 0) {
       where.tags = { hasSome: filters.tags };
+    }
+
+    // Search filter (searches in title and content)
+    if (filters?.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { content: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Upcoming notes filter (due within 7 days)
+    if (filters?.isUpcoming) {
+      const now = new Date();
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(now.getDate() + 7);
+
+      where.dueDate = {
+        gte: now,
+        lte: sevenDaysFromNow,
+      };
+      where.status = { not: NoteStatus.COMPLETED };
+    }
+
+    // Overdue notes filter
+    if (filters?.isOverdue) {
+      const now = new Date();
+      where.dueDate = { lt: now };
+      where.status = { not: NoteStatus.COMPLETED };
     }
 
     const orderBy = [

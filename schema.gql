@@ -85,11 +85,40 @@ type PaginatedNotes {
 type Query {
   health: String!
   getMyProfile: Profile!
-  getMyNotes(limit: Int = 20, offset: Int = 0, cursor: Int, type: NoteType, status: NoteStatus, isArchived: Boolean, isPinned: Boolean, tags: [String!]): PaginatedNotes!
-  getNote(id: Int!): Note!
-  getUpcomingNotes(limit: Int = 20, offset: Int = 0, cursor: Int): PaginatedNotes!
-  getOverdueNotes(limit: Int = 20, offset: Int = 0, cursor: Int): PaginatedNotes!
-  searchNotes(query: String!, limit: Int = 20, offset: Int = 0, cursor: Int): PaginatedNotes!
+
+  """Get notes with flexible filtering, pagination, and search"""
+  notes(
+    limit: Int = 20
+    offset: Int = 0
+    cursor: Int
+
+    """Filter by note type"""
+    type: NoteType
+
+    """Filter by status"""
+    status: NoteStatus
+
+    """Filter archived notes"""
+    isArchived: Boolean
+
+    """Filter pinned notes"""
+    isPinned: Boolean
+
+    """Filter by tags (max 20)"""
+    tags: [String!]
+
+    """Search in title and content"""
+    search: String
+
+    """Filter upcoming notes (due within 7 days)"""
+    isUpcoming: Boolean
+
+    """Filter overdue notes"""
+    isOverdue: Boolean
+  ): PaginatedNotes!
+
+  """Get a single note by ID"""
+  note(id: Int!): Note!
 }
 
 type Mutation {
