@@ -429,6 +429,70 @@ scp user@server:~/backup.tar.gz.enc ~/secure-backups/
 # Or copy .env content to password manager
 ```
 
+#### Option D: Webhook Environment Variables (Future Enhancement)
+
+Pass environment variables directly through webhook configuration - no manual server setup needed!
+
+**How it works:**
+The webhook tool can pass environment variables to `deploy.sh` when triggered, eliminating the need for manual `.env` file creation.
+
+**Setup:**
+1. Add `pass-environment-to-command` to `/opt/hooks/hooks.json`:
+   ```json
+   {
+     "id": "deploy-backend",
+     "execute-command": "/home/youruser/projects/notes-stt/notes-stt-be/deploy.sh",
+     "command-working-directory": "/home/youruser/projects/notes-stt/notes-stt-be",
+     "pass-environment-to-command": [
+       {
+         "source": "string",
+         "name": "POSTGRES_PASSWORD",
+         "value": "your_postgres_password_here"
+       },
+       {
+         "source": "string",
+         "name": "JWT_SECRET",
+         "value": "your_jwt_secret_here"
+       },
+       {
+         "source": "string",
+         "name": "CORS_ORIGIN",
+         "value": "https://notes-stt.baokhangdev.click"
+       }
+     ],
+     "trigger-rule": { ... }
+   }
+   ```
+
+2. Update `deploy.sh` to use environment variables:
+   ```bash
+   # Create .env from environment variables
+   if [ -n "${POSTGRES_PASSWORD:-}" ]; then
+       cat > .env << EOF
+   POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+   JWT_SECRET=${JWT_SECRET}
+   CORS_ORIGIN=${CORS_ORIGIN}
+   NODE_ENV=production
+   PORT=3000
+   EOF
+   fi
+   ```
+
+3. Protect hooks.json:
+   ```bash
+   sudo chmod 600 /opt/hooks/hooks.json
+   ```
+
+**Advantages:**
+- ✅ Zero manual server setup
+- ✅ All secrets in one file
+- ✅ Easy to update
+- ✅ No separate .env management
+
+**Disadvantages:**
+- ⚠️ Requires modifying both hooks.json and deploy.sh
+- ⚠️ Secrets visible in hooks.json (must protect file permissions)
+
 </details>
 
 ---

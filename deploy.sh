@@ -33,73 +33,126 @@ if [ ! -d .git ]; then
 fi
 
 log "Fetching latest from origin/$BRANCH"
-git fetch --all --prune
+git fetch --all --prune 2>&1 | tee -a "$LOG_FILE"
+log "Fetch completed"
 
 # Checkout and align with remote branch (clean reset for a deterministic deploy)
 if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
-    git checkout "$BRANCH"
+    log "Checking out existing branch: $BRANCH"
+    git checkout "$BRANCH" 2>&1 | tee -a "$LOG_FILE"
 else
-    git checkout -b "$BRANCH" "origin/$BRANCH"
+    log "Creating new local branch: $BRANCH from origin/$BRANCH"
+    git checkout -b "$BRANCH" "origin/$BRANCH" 2>&1 | tee -a "$LOG_FILE"
 fi
-git fetch origin "$BRANCH"
-git reset --hard "origin/$BRANCH"
-git clean -fdx
 
-log "Repository updated to $(git rev-parse --short HEAD)"
+log "Resetting to origin/$BRANCH"
+git fetch origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE"
+git reset --hard "origin/$BRANCH" 2>&1 | tee -a "$LOG_FILE"
+log "Cleaning untracked files"
+git clean -fdx 2>&1 | tee -a "$LOG_FILE"
+
+CURRENT_COMMIT=$(git rev-parse --short HEAD)
+CURRENT_COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1)
+log "Repository updated to commit: $CURRENT_COMMIT"
+log "Commit message: $CURRENT_COMMIT_MSG"
 
 # Create/update .env file if it doesn't exist
+log "Checking for .env file"
 if [ ! -f .env ]; then
-    log "Creating .env file from template"
+    log ".env file not found, creating from template"
     if [ -f /etc/notes-stt/.env ]; then
         cp /etc/notes-stt/.env .env
-        log ".env file created from /etc/notes-stt/.env"
+        log "✓ .env file created from /etc/notes-stt/.env"
+        log "  Environment variables loaded: $(grep -c '^[^#]' .env) variables"
     else
         error ".env file not found. Please create /etc/notes-stt/.env or add .env to repo root"
         exit 1
     fi
 else
-    log ".env file already exists, skipping creation"
+    log "✓ .env file already exists ($(grep -c '^[^#]' .env) variables loaded)"
 fi
 
 log "Stopping and removing only this application's containers"
-docker-compose down || log "docker-compose down returned non-zero"
+docker-compose down 2>&1 | tee -a "$LOG_FILE" || log "docker-compose down returned non-zero"
+log "Containers stopped and removed"
 
-log "Building and starting containers"
-# Normal build - Docker will use cache when possible
-docker-compose up -d --build
+log "Building Docker images (this may take a while)..."
+log "Build output:"
+log "----------------------------------------"
+# Build first with output visible in logs
+docker-compose build 2>&1 | tee -a "$LOG_FILE"
+BUILD_EXIT_CODE=${PIPESTATUS[0]}
+log "----------------------------------------"
+if [ $BUILD_EXIT_CODE -eq 0 ]; then
+    log "Docker build completed successfully"
+else
+    error "Docker build failed with exit code $BUILD_EXIT_CODE"
+    exit 1
+fi
 
-log "Waiting for services to initialize..."
+log "Starting containers in detached mode"
+docker-compose up -d 2>&1 | tee -a "$LOG_FILE"
+log "Containers started"
+
+log "Waiting for services to initialize (10 seconds)..."
 sleep 10
+log "Initial wait completed, starting health checks"
 
 # Health check loop
+log "Starting health check loop"
 HEALTH_URL="http://localhost:3000/graphql?query={__typename}"
 MAX_ATTEMPTS=12
 SLEEP_SECONDS=5
 attempt=1
 until [ $attempt -gt $MAX_ATTEMPTS ]
 do
-    if curl -sf "$HEALTH_URL" >/dev/null; then
-        log "Backend health check passed (attempt $attempt)"
+    log "Health check attempt $attempt/$MAX_ATTEMPTS..."
+    if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+        log "✓ Backend health check PASSED (attempt $attempt)"
+        log "✓ Backend is healthy and responding"
         break
     else
-        log "Backend not healthy yet (attempt $attempt/$MAX_ATTEMPTS), sleeping $SLEEP_SECONDSs"
-        sleep $SLEEP_SECONDS
+        log "✗ Backend not healthy yet (attempt $attempt/$MAX_ATTEMPTS)"
+        if [ $attempt -lt $MAX_ATTEMPTS ]; then
+            log "  Waiting ${SLEEP_SECONDS}s before next attempt..."
+            sleep $SLEEP_SECONDS
+        fi
     fi
     attempt=$((attempt+1))
 done
 
 if [ $attempt -gt $MAX_ATTEMPTS ]; then
-    error "Backend failed health checks after $MAX_ATTEMPTS attempts"
-    docker-compose logs --tail=200 backend || true
+    error "Backend FAILED health checks after $MAX_ATTEMPTS attempts"
+    error "Dumping last 200 lines of backend logs:"
+    log "========================================="
+    docker-compose logs --tail=200 backend 2>&1 | tee -a "$LOG_FILE" || true
+    log "========================================="
     exit 1
 fi
 
 log "Cleaning up dangling images for this application only"
-# Only remove dangling images (untagged), not all unused images
-docker image prune -f --filter "dangling=true" || true
+PRUNED=$(docker image prune -f --filter "dangling=true" 2>&1)
+if echo "$PRUNED" | grep -q "Total reclaimed space"; then
+    RECLAIMED=$(echo "$PRUNED" | grep "Total reclaimed space" | awk '{print $NF}')
+    log "✓ Cleanup completed: reclaimed $RECLAIMED"
+else
+    log "✓ No dangling images to clean up"
+fi
 
-log "Deployment finished successfully"
+log "========================================="
+log "🎉 DEPLOYMENT FINISHED SUCCESSFULLY"
+log "========================================="
 log "Container status:"
-docker-compose ps | tee -a "$LOG_FILE"
+docker-compose ps 2>&1 | tee -a "$LOG_FILE"
+
+log ""
+log "Deployment summary:"
+log "  Branch: $BRANCH"
+log "  Commit: $CURRENT_COMMIT - $CURRENT_COMMIT_MSG"
+log "  Backend API: http://localhost:3000/graphql"
+log "  Health check: PASSED"
+log ""
+log "Full logs available at: $LOG_FILE"
+log "========================================="
 
 exit 0
