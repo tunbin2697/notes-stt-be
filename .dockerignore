@@ -1,0 +1,53 @@
+# Dependencies
+node_modules
+npm-debug.log
+package-lock.json
+
+# Development files
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Testing
+coverage
+.nyc_output
+*.spec.ts
+test/
+
+# Build output (will be generated in container)
+dist
+
+# Logs
+logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation and examples
+README.md
+Architecture_pattern_guide.md
+guideline/
+examples/
+
+# Prisma
+prisma/migrations/*.sql
+!prisma/schema.prisma
+!prisma/migrations/migration_lock.toml
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
