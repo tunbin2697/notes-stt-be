@@ -253,16 +253,17 @@ mkdir -p ~/projects/notes-stt
 cd ~/projects/notes-stt
 
 # Clone backend repository
-git clone <your-backend-repo-url> .
+git clone https://github.com/tunbin2697/notes-stt-be.git
 
 # Your structure should look like:
 ~/projects/notes-stt/
-├── Dockerfile
-├── docker-compose.yml
-├── deploy.sh
-├── prisma/
-├── src/
-└── package.json
+└── notes-stt-be/          # ← Repository creates its own folder
+    ├── Dockerfile
+    ├── docker-compose.yml
+    ├── deploy.sh
+    ├── prisma/
+    ├── src/
+    └── package.json
 ```
 
 ### 2. Environment Variables
@@ -435,14 +436,14 @@ scp user@server:~/backup.tar.gz.enc ~/secure-backups/
 ### 3. Make deploy.sh Executable
 
 ```bash
-cd ~/projects/notes-stt
+cd ~/projects/notes-stt/notes-stt-be
 chmod +x deploy.sh
 ```
 
 ### 4. Test Docker Build
 
 ```bash
-cd ~/projects/notes-stt
+cd ~/projects/notes-stt/notes-stt-be
 
 # Build and start containers
 docker-compose up -d --build
@@ -465,7 +466,7 @@ curl http://notes-stt.baokhangdev.click/graphql?query={__typename}
 ### 5. Stop Test Containers
 
 ```bash
-cd ~/projects/notes-stt
+cd ~/projects/notes-stt/notes-stt-be
 docker-compose down
 ```
 
@@ -527,14 +528,14 @@ sudo nano /opt/hooks/hooks.json
 [
   {
     "id": "deploy-backend",
-    "execute-command": "/home/youruser/projects/notes-stt/deploy.sh",
-    "command-working-directory": "/home/youruser/projects/notes-stt",
+    "execute-command": "/home/youruser/projects/notes-stt/notes-stt-be/deploy.sh",
+    "command-working-directory": "/home/youruser/projects/notes-stt/notes-stt-be",
     "response-message": "Backend deployment triggered!",
     "trigger-rule": {
       "and": [
         {
           "match": {
-            "type": "payload-hash-sha256",
+            "type": "payload-hmac-sha256",
             "secret": "YOUR_WEBHOOK_SECRET_HERE",
             "parameter": {
               "source": "header",
@@ -567,8 +568,8 @@ sudo nano /opt/hooks/hooks.json
    # Example output: /home/ubuntu
    
    # Update the paths in hooks.json to use your actual home
-   # Change: /home/youruser/projects/notes-stt/deploy.sh
-   # To:     /home/ubuntu/projects/notes-stt/deploy.sh
+   # Change: /home/youruser/projects/notes-stt/notes-stt-be/deploy.sh
+   # To:     /home/ubuntu/projects/notes-stt/notes-stt-be/deploy.sh
    ```
 
 2. **Replace `YOUR_WEBHOOK_SECRET_HERE`** with the secret you generated above
@@ -658,7 +659,7 @@ sudo journalctl -u webhook -f
 **Method 1: Manual test (from server)**
 
 ```bash
-cd ~/projects/notes-stt
+cd ~/projects/notes-stt/notes-stt-be
 ./deploy.sh
 ```
 
@@ -672,7 +673,7 @@ git push origin production
 # Then on server, monitor logs
 sudo journalctl -u webhook -f
 # In another terminal:
-tail -f ~/projects/notes-stt/deploy.log
+tail -f ~/projects/notes-stt/notes-stt-be/deploy.log
 ```
 
 **Method 3: Test webhook from GitHub**
@@ -695,7 +696,7 @@ curl https://notes-stt.baokhangdev.click/graphql?query={__typename}
 # Should return: {"data":{"__typename":"Query"}}
 
 # Check deployment logs
-tail -50 ~/projects/notes-stt/deploy.log
+tail -50 ~/projects/notes-stt/notes-stt-be/deploy.log
 ```
 
 ---
@@ -735,7 +736,7 @@ docker logs -f stt_notes_db
 sudo journalctl -u webhook -f
 
 # Check deployment logs
-tail -f ~/projects/notes-stt/deploy.log
+tail -f ~/projects/notes-stt/notes-stt-be/deploy.log
 
 # Check Nginx logs
 sudo tail -f /var/log/nginx/notes-stt.baokhangdev.click.access.log
@@ -759,7 +760,7 @@ sudo netstat -tulpn | grep :3000
 sudo netstat -tulpn | grep :5433
 
 # Restart containers
-cd ~/projects/notes-stt
+cd ~/projects/notes-stt/notes-stt-be
 docker-compose down
 docker-compose up -d --build
 ```
@@ -774,7 +775,7 @@ docker logs stt_notes_db
 docker exec stt_notes_db pg_isready -U postgres
 
 # Verify DATABASE_URL in .env
-cat ~/projects/notes-stt/.env | grep DATABASE_URL
+cat ~/projects/notes-stt/notes-stt-be/.env | grep DATABASE_URL
 ```
 
 **Problem**: Webhook not triggering
@@ -815,7 +816,7 @@ sudo systemctl reload nginx
 
 ```bash
 # Restart all services
-cd ~/projects/notes-stt
+cd ~/projects/notes-stt/notes-stt-be
 docker-compose restart
 
 # View container status

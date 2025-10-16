@@ -61,27 +61,15 @@ else
     log ".env file already exists, skipping creation"
 fi
 
-log "Bringing down existing containers (if any)"
+log "Stopping and removing only this application's containers"
 docker-compose down || log "docker-compose down returned non-zero"
 
-log "Building and starting containers (clean rebuild)"
-# Use --build and --force-recreate for a clean restart
-docker-compose up -d --build --force-recreate --remove-orphans
+log "Building and starting containers"
+# Normal build - Docker will use cache when possible
+docker-compose up -d --build
 
 log "Waiting for services to initialize..."
-sleep 5
-
-# Optional: run Prisma migrations explicitly (container command may already run them)
-log "Running database migrations inside backend container (if applicable)"
-if docker-compose ps --services | grep -q '^backend$'; then
-    if docker-compose exec -T backend npx prisma migrate deploy; then
-        log "Database migrations completed"
-    else
-        log "No migrations run or migrations failed (continuing)"
-    fi
-else
-    log "Backend service not found in docker-compose; skipping explicit migrations"
-fi
+sleep 10
 
 # Health check loop
 HEALTH_URL="http://localhost:3000/graphql?query={__typename}"
@@ -106,8 +94,9 @@ if [ $attempt -gt $MAX_ATTEMPTS ]; then
     exit 1
 fi
 
-log "Cleaning up unused Docker images"
-docker image prune -f || true
+log "Cleaning up dangling images for this application only"
+# Only remove dangling images (untagged), not all unused images
+docker image prune -f --filter "dangling=true" || true
 
 log "Deployment finished successfully"
 log "Container status:"
