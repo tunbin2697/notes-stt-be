@@ -45,7 +45,7 @@ services:
         echo 'Waiting for database...' &&
         npx prisma migrate deploy &&
         echo 'Database migrations completed!' &&
-        node dist/main.js
+        node dist/src/main.js
       "
 
 networks:
