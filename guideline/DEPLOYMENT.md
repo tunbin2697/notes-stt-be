@@ -531,13 +531,17 @@ docker-compose ps
 # View logs
 docker-compose logs -f backend
 
-# Test backend API
-curl http://localhost:3000/graphql?query={health}
+# Test backend API (GraphQL POST request)
+curl -X POST http://localhost:3000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ health }"}'
 
 # Should return: {"data":{"health":"ok"}}
 
 # Test via Nginx proxy
-curl http://notes-stt.baokhangdev.click/graphql?query={health}
+curl -X POST http://notes-stt.baokhangdev.click/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ health }"}'
 ```
 
 ### 5. Stop Test Containers
@@ -777,8 +781,10 @@ tail -f ~/projects/notes-stt/notes-stt-be/deploy.log
 # Check containers are running
 docker ps
 
-# Test backend API
-curl https://notes-stt.baokhangdev.click/graphql?query={health}
+# Test backend API (GraphQL POST request)
+curl -X POST https://notes-stt.baokhangdev.click/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ health }"}'
 
 # Should return: {"data":{"health":"ok"}}
 
@@ -914,11 +920,15 @@ chmod +x ~/projects/notes-stt/notes-stt-be/deploy.sh
 **Problem**: API not accessible via domain
 
 ```bash
-# Test locally first
-curl http://localhost:3000/graphql?query={health}
+# Test locally first (GraphQL POST request)
+curl -X POST http://localhost:3000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ health }"}'
 
 # Test Nginx proxy
-curl http://notes-stt.baokhangdev.click/graphql?query={health}
+curl -X POST http://notes-stt.baokhangdev.click/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ health }"}'
 
 # Check Nginx configuration
 sudo nginx -t

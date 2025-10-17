@@ -106,14 +106,15 @@ log "Initial wait completed, starting health checks"
 
 # Health check loop
 log "Starting health check loop"
-HEALTH_URL="http://localhost:3000/graphql?query={health}"
 MAX_ATTEMPTS=12
 SLEEP_SECONDS=5
 attempt=1
 until [ $attempt -gt $MAX_ATTEMPTS ]
 do
     log "Health check attempt $attempt/$MAX_ATTEMPTS..."
-    if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+    if curl -sf -X POST http://localhost:3000/graphql \
+        -H "Content-Type: application/json" \
+        -d '{"query":"{ health }"}' | grep -q '"health"'; then
         log "✓ Backend health check PASSED (attempt $attempt)"
         log "✓ Backend is healthy and responding"
         break
