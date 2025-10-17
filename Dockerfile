@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:24.9-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -24,7 +24,7 @@ RUN npm run build
 RUN ls -la /app/dist && echo "Build completed successfully"
 
 # Stage 2: Production
-FROM node:20-alpine AS production
+FROM node:24.9-alpine AS production
 
 # Set working directory
 WORKDIR /app
