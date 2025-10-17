@@ -29,8 +29,19 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
+      // Allow requests with no origin (like curl, Postman, or internal proxies)
       if (!origin) return callback(null, true);
+
+      // Allow whitelisted origins
       if (whitelist.includes(origin)) return callback(null, true);
+
+      // Allow requests from localhost (internal Nginx proxy)
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+
+      // Log rejected origins for debugging
+      console.warn(`CORS: Blocked origin: ${origin}`);
       return callback(new Error('CORS policy: origin not allowed'), false);
     },
     credentials: true,
@@ -41,5 +52,10 @@ async function bootstrap() {
   app.useGlobalFilters(new GraphQLExceptionFilter());
 
   await app.listen(process.env.PORT ?? 3000);
+
+  console.log(
+    `Application is running on: http://localhost:${process.env.PORT ?? 3000}`,
+  );
+  console.log(`CORS whitelist: ${whitelist.join(', ')}`);
 }
 bootstrap();
