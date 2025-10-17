@@ -95,9 +95,9 @@ sudo nano /etc/nginx/sites-available/notes-stt.baokhangdev.click
 server {
     listen 80;
     listen [::]:80;
-    
+
     server_name notes-stt.baokhangdev.click www.notes-stt.baokhangdev.click;
-    
+
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -109,17 +109,17 @@ server {
     location /graphql {
         proxy_pass http://localhost:3000/graphql;
         proxy_http_version 1.1;
-        
+
         # Headers
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
+
         # WebSocket support (if needed)
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        
+
         # Timeouts
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
@@ -132,12 +132,12 @@ server {
     location /webhook/ {
         proxy_pass http://localhost:9000/hooks/;
         proxy_http_version 1.1;
-        
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
+
         # Webhook timeout
         proxy_read_timeout 300s;
     }
@@ -151,7 +151,7 @@ server {
     #     index index.html;
     #     try_files $uri $uri/ /index.html;
     # }
-    
+
     # Temporary placeholder for root
     location / {
         return 200 'Backend API available at /graphql';
@@ -321,13 +321,15 @@ ls -l /etc/notes-stt/.env
 ```
 
 **How it works:**
+
 - ✅ `.env` stored in `/etc/notes-stt/` (outside repo, protected)
 - ✅ `deploy.sh` automatically copies it to repo on first run
 - ✅ Git will ignore `.env` (already in `.gitignore`)
 - ✅ Survives `git clean` and repository resets
 - ✅ Backup this file securely!
 
-⚠️ **Important**: 
+⚠️ **Important**:
+
 - Never commit `.env` to Git!
 - Store a backup of `/etc/notes-stt/.env` in a secure password manager
 - If the file is deleted, deployment will fail with clear error message
@@ -344,6 +346,7 @@ The current setup (protected directory `/etc/notes-stt/.env`) is **recommended f
 #### Option A: Current Setup (Recommended) ✅
 
 **Advantages:**
+
 - ✅ Simple and secure
 - ✅ No GitHub Actions needed
 - ✅ Works with free private repos
@@ -355,6 +358,7 @@ The current setup (protected directory `/etc/notes-stt/.env`) is **recommended f
 **Note**: Requires GitHub Actions (2,000 minutes/month limit on free private repos). Your current webhook setup doesn't use GitHub Actions.
 
 **Setup:**
+
 1. Store secrets in GitHub (Settings → Secrets and variables → Actions)
 2. Create `.env` in GitHub Actions workflow:
    ```yaml
@@ -371,6 +375,7 @@ The current setup (protected directory `/etc/notes-stt/.env`) is **recommended f
 3. Deploy via SSH using `appleboy/scp-action`
 
 **Disadvantages:**
+
 - ❌ Requires GitHub Actions (limited minutes)
 - ❌ More complex than current setup
 - ❌ Doesn't work with webhook-only deployment
@@ -380,6 +385,7 @@ The current setup (protected directory `/etc/notes-stt/.env`) is **recommended f
 Store encrypted `.env` in repository and decrypt on server.
 
 **Setup:**
+
 ```bash
 # Install age encryption tool
 sudo apt-get install age
@@ -397,22 +403,24 @@ age -d -i ~/.secrets.key .env.enc > .env
 ```
 
 **Advantages:**
+
 - ✅ Secrets backed up in Git (encrypted)
 - ✅ Works with webhook deployment
 - ✅ Easy to rotate secrets
 
 **Disadvantages:**
+
 - ⚠️ Requires age encryption tool
 - ⚠️ Must manage decryption key on server
 - ⚠️ Key loss = can't decrypt secrets
 
 #### Comparison Table
 
-| Method | Complexity | Security | GitHub Actions | Works with Webhooks |
-|--------|-----------|----------|----------------|---------------------|
-| **Protected dir** | ⭐ Low | ⭐⭐⭐ High | ❌ No | ✅ Yes |
-| GitHub Secrets | ⭐⭐ Medium | ⭐⭐⭐ High | ✅ Required | ❌ No |
-| Encrypted in repo | ⭐⭐⭐ High | ⭐⭐ Medium | ❌ No | ✅ Yes |
+| Method            | Complexity  | Security    | GitHub Actions | Works with Webhooks |
+| ----------------- | ----------- | ----------- | -------------- | ------------------- |
+| **Protected dir** | ⭐ Low      | ⭐⭐⭐ High | ❌ No          | ✅ Yes              |
+| GitHub Secrets    | ⭐⭐ Medium | ⭐⭐⭐ High | ✅ Required    | ❌ No               |
+| Encrypted in repo | ⭐⭐⭐ High | ⭐⭐ Medium | ❌ No          | ✅ Yes              |
 
 #### Backup Strategy
 
@@ -437,7 +445,9 @@ Pass environment variables directly through webhook configuration - no manual se
 The webhook tool can pass environment variables to `deploy.sh` when triggered, eliminating the need for manual `.env` file creation.
 
 **Setup:**
+
 1. Add `pass-environment-to-command` to `/opt/hooks/hooks.json`:
+
    ```json
    {
      "id": "deploy-backend",
@@ -465,6 +475,7 @@ The webhook tool can pass environment variables to `deploy.sh` when triggered, e
    ```
 
 2. Update `deploy.sh` to use environment variables:
+
    ```bash
    # Create .env from environment variables
    if [ -n "${POSTGRES_PASSWORD:-}" ]; then
@@ -484,12 +495,14 @@ The webhook tool can pass environment variables to `deploy.sh` when triggered, e
    ```
 
 **Advantages:**
+
 - ✅ Zero manual server setup
 - ✅ All secrets in one file
 - ✅ Easy to update
 - ✅ No separate .env management
 
 **Disadvantages:**
+
 - ⚠️ Requires modifying both hooks.json and deploy.sh
 - ⚠️ Secrets visible in hooks.json (must protect file permissions)
 
@@ -519,12 +532,12 @@ docker-compose ps
 docker-compose logs -f backend
 
 # Test backend API
-curl http://localhost:3000/graphql?query={__typename}
+curl http://localhost:3000/graphql?query={health}
 
-# Should return: {"data":{"__typename":"Query"}}
+# Should return: {"data":{"health":"ok"}}
 
 # Test via Nginx proxy
-curl http://notes-stt.baokhangdev.click/graphql?query={__typename}
+curl http://notes-stt.baokhangdev.click/graphql?query={health}
 ```
 
 ### 5. Stop Test Containers
@@ -634,11 +647,12 @@ sudo nano /opt/hooks/hooks.json
 **Important customization steps:**
 
 1. **Replace `/home/youruser`** with your actual home directory:
+
    ```bash
    # Find your home directory
    echo $HOME
    # Example output: /home/ubuntu
-   
+
    # Update the paths in hooks.json to use your actual home
    # Change: /home/youruser/projects/notes-stt/notes-stt-be/deploy.sh
    # To:     /home/ubuntu/projects/notes-stt/notes-stt-be/deploy.sh
@@ -649,6 +663,7 @@ sudo nano /opt/hooks/hooks.json
 3. **Save and exit** (Ctrl+X, then Y, then Enter)
 
 **What the trigger rules do:**
+
 - ✅ HMAC SHA-256 signature validation (ensures request is from GitHub)
 - ✅ Only `production` branch triggers deployment
 - ✅ No separate handler script needed!
@@ -763,9 +778,9 @@ tail -f ~/projects/notes-stt/notes-stt-be/deploy.log
 docker ps
 
 # Test backend API
-curl https://notes-stt.baokhangdev.click/graphql?query={__typename}
+curl https://notes-stt.baokhangdev.click/graphql?query={health}
 
-# Should return: {"data":{"__typename":"Query"}}
+# Should return: {"data":{"health":"ok"}}
 
 # Check deployment logs
 tail -50 ~/projects/notes-stt/notes-stt-be/deploy.log
@@ -873,6 +888,7 @@ sudo tail -f /var/log/nginx/notes-stt.baokhangdev.click.access.log
 This happens when git updates remove execute permission from deploy.sh.
 
 **Solution 1 (Recommended)**: Use bash explicitly in hooks.json (already configured):
+
 ```json
 {
   "execute-command": "/bin/bash",
@@ -884,9 +900,11 @@ This happens when git updates remove execute permission from deploy.sh.
   ]
 }
 ```
+
 Then restart webhook: `sudo systemctl restart webhook`
 
 **Solution 2**: Manually restore execute permission:
+
 ```bash
 chmod +x ~/projects/notes-stt/notes-stt-be/deploy.sh
 ```
@@ -897,10 +915,10 @@ chmod +x ~/projects/notes-stt/notes-stt-be/deploy.sh
 
 ```bash
 # Test locally first
-curl http://localhost:3000/graphql?query={__typename}
+curl http://localhost:3000/graphql?query={health}
 
 # Test Nginx proxy
-curl http://notes-stt.baokhangdev.click/graphql?query={__typename}
+curl http://notes-stt.baokhangdev.click/graphql?query={health}
 
 # Check Nginx configuration
 sudo nginx -t
@@ -940,6 +958,7 @@ sudo systemctl reload nginx
 When you're ready to deploy frontend, you'll need to:
 
 1. **Uncomment frontend section in Nginx config**:
+
    ```nginx
    location / {
        root /var/www/notes-stt.baokhangdev.click;
@@ -972,4 +991,3 @@ Your backend is now deployed with:
 **Backend API Endpoint**: `https://notes-stt.baokhangdev.click/graphql`
 
 **Webhook URL**: `https://notes-stt.baokhangdev.click/webhook/deploy-backend`
-

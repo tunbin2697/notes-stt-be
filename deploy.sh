@@ -106,7 +106,7 @@ log "Initial wait completed, starting health checks"
 
 # Health check loop
 log "Starting health check loop"
-HEALTH_URL="http://localhost:3000/graphql?query={__typename}"
+HEALTH_URL="http://localhost:3000/graphql?query={health}"
 MAX_ATTEMPTS=12
 SLEEP_SECONDS=5
 attempt=1
