@@ -129,6 +129,8 @@ type Mutation {
   changePassword(input: ChangePasswordInput!): Boolean!
   forgotPassword(email: String!): Boolean!
   resetPassword(input: ResetPasswordInput!): Boolean!
+  requestLogoutAllOTP(email: String!): Boolean!
+  logoutAll(input: LogoutAllInput!): Boolean!
   updateMyProfile(input: UpdateProfileInput!): Boolean!
   createNote(input: CreateNoteInput!): Note!
   updateNote(id: Int!, input: UpdateNoteInput!): Note!
@@ -155,6 +157,11 @@ input ResetPasswordInput {
   email: String!
   otp: String!
   newPassword: String!
+}
+
+input LogoutAllInput {
+  email: String!
+  otp: String!
 }
 
 input UpdateProfileInput {

@@ -23,6 +23,9 @@ export const SECURITY_CONFIG = {
   auth: {
     maxDevices: Number(process.env.MAX_DEVICES) || 3,
   },
+  otp: {
+    expiresInSeconds: Number(process.env.OTP_EXPIRES_IN_SECONDS) || 60, // 60 seconds default
+  },
   password: {
     // Regex must be defined as a string for configuration
     REGEX_PATTERN: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$',

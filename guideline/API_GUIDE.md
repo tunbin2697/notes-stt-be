@@ -121,11 +121,36 @@ mutation Refresh {
 
 ### **Logout**
 
+**Regular Logout (Current Device):**
+
 ```graphql
 mutation Logout {
-  logout # Returns true, clears refresh token
+  logout # Returns true, clears current refresh token
 }
 ```
+
+**Logout All Devices (Security Feature):**
+
+For lost/stolen devices or suspicious activity:
+
+```graphql
+# Step 1: Request OTP
+mutation {
+  requestLogoutAllOTP(email: "user@example.com")
+}
+
+# Step 2: Check email/logs for 6-digit OTP, then submit:
+mutation {
+  logoutAll(input: { email: "user@example.com", otp: "123456" })
+}
+```
+
+**Security:**
+
+- ✅ Revokes ALL refresh tokens across all devices
+- ✅ Email OTP verification (60-second expiration)
+- ✅ One-time use, transaction-based
+- ✅ No authentication required (uses email verification)
 
 ---
 
@@ -635,7 +660,7 @@ mutation ForgotPassword {
 **Effects:**
 
 - 6-digit OTP generated
-- OTP valid for 10 minutes
+- OTP valid for 60 seconds
 - Email sent (console in dev)
 - Check console for OTP code!
 
@@ -670,7 +695,7 @@ To: user@example.com
 Subject: Password Reset Code
 ───────────────────────────────────────────────
 Your password reset code is: 123456
-This code will expire in 10 minutes.
+This code will expire in 60 seconds.
 ═══════════════════════════════════════════════
 ```
 

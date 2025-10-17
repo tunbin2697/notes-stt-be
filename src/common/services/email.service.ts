@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SECURITY_CONFIG } from '@/config/security.config';
 
 /**
  * Mock Email Service
@@ -18,7 +19,9 @@ export class EmailService {
     console.log(`To: ${email}`);
     console.log(`Subject: Password Reset Code`);
     console.log(`\nYour password reset code is: ${otp}`);
-    console.log(`This code will expire in 10 minutes.`);
+    console.log(
+      `This code will expire in ${SECURITY_CONFIG.otp.expiresInSeconds} seconds.`,
+    );
     console.log('\nDo not share this code with anyone.');
     console.log('========================================\n');
 
@@ -38,6 +41,45 @@ export class EmailService {
     console.log(`\nYour password was successfully changed.`);
     console.log(
       `If you did not make this change, please contact support immediately.`,
+    );
+    console.log('========================================\n');
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  /**
+   * Mock send logout all OTP email
+   */
+  async sendLogoutAllOTP(email: string, otp: string): Promise<void> {
+    console.log('\n========================================');
+    console.log('📧 MOCK EMAIL - Logout All Devices OTP');
+    console.log('========================================');
+    console.log(`To: ${email}`);
+    console.log(`Subject: Logout from All Devices - Verification Code`);
+    console.log(`\nYour verification code is: ${otp}`);
+    console.log(
+      `This code will expire in ${SECURITY_CONFIG.otp.expiresInSeconds} seconds.`,
+    );
+    console.log(`\nThis will logout all active sessions on all devices.`);
+    console.log('Do not share this code with anyone.');
+    console.log('========================================\n');
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  /**
+   * Mock send logout all confirmation email
+   */
+  async sendLogoutAllConfirmation(email: string): Promise<void> {
+    console.log('\n========================================');
+    console.log('📧 MOCK EMAIL - All Sessions Logged Out');
+    console.log('========================================');
+    console.log(`To: ${email}`);
+    console.log(`Subject: All sessions have been logged out`);
+    console.log(`\nYou have been logged out from all devices.`);
+    console.log(`All active sessions have been terminated.`);
+    console.log(
+      `\nIf you did not request this, please change your password immediately.`,
     );
     console.log('========================================\n');
 

@@ -8,6 +8,7 @@ import { BusinessRuleException } from '@/common/exceptions/business-rule.excepti
 import { ChangePasswordInput } from './dto/change-password.input';
 import { ResetPasswordInput } from './dto/reset-password.input';
 import { LoginInput } from './dto/login.input';
+import { LogoutAllInput } from './dto/logout-all.input';
 @Resolver()
 export class AuthResolver {
   constructor(private auth: AuthService) {}
@@ -101,6 +102,18 @@ export class AuthResolver {
     @Args('input') input: ResetPasswordInput,
   ): Promise<boolean> {
     await this.auth.resetPassword(input.email, input.otp, input.newPassword);
+    return true;
+  }
+
+  @Mutation(() => Boolean)
+  async requestLogoutAllOTP(@Args('email') email: string): Promise<boolean> {
+    await this.auth.requestLogoutAllOTP(email);
+    return true;
+  }
+
+  @Mutation(() => Boolean)
+  async logoutAll(@Args('input') input: LogoutAllInput): Promise<boolean> {
+    await this.auth.logoutAllWithOTP(input.email, input.otp);
     return true;
   }
 }

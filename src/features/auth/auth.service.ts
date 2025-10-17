@@ -222,8 +222,10 @@ export class AuthService {
     // Generate OTP
     const otp = this.email.generateOTP();
 
-    // Store OTP in database (expires in 10 minutes)
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    // Store OTP in database (expires based on config)
+    const expiresAt = new Date(
+      Date.now() + SECURITY_CONFIG.otp.expiresInSeconds * 1000,
+    );
 
     // Invalidate any existing unused password reset tokens for this account
     await (this.prisma as any).passwordReset.updateMany({
@@ -300,5 +302,95 @@ export class AuthService {
 
     // Revoke all refresh tokens for security
     await this.revokeAllForUser(account.id);
+  }
+
+  /**
+   * Request OTP for logout all sessions
+   * Sends OTP to user's email to verify they want to logout from all devices
+   */
+  async requestLogoutAllOTP(email: string): Promise<void> {
+    // Check if account exists
+    const account = await (this.prisma as any).account.findUnique({
+      where: { email },
+    });
+
+    if (!account) {
+      // For security, don't reveal if email exists or not
+      return;
+    }
+
+    // Generate OTP
+    const otp = this.email.generateOTP();
+
+    // Store OTP in database (expires based on config)
+    const expiresAt = new Date(
+      Date.now() + SECURITY_CONFIG.otp.expiresInSeconds * 1000,
+    );
+
+    // Invalidate any existing unused logout tokens for this account
+    await (this.prisma as any).passwordReset.updateMany({
+      where: { accountId: account.id, used: false } as any,
+      data: { used: true },
+    });
+
+    // Create new logout verification token (reusing passwordReset table)
+    await (this.prisma as any).passwordReset.create({
+      data: {
+        token: otp,
+        accountId: account.id,
+        expiresAt,
+      },
+    });
+
+    // Send OTP via email
+    await this.email.sendLogoutAllOTP(email, otp);
+  }
+
+  /**
+   * Logout from all devices using OTP verification
+   * This revokes all refresh tokens for the user
+   */
+  async logoutAllWithOTP(email: string, otp: string): Promise<void> {
+    // Find account
+    const account = await (this.prisma as any).account.findUnique({
+      where: { email },
+    });
+
+    if (!account) {
+      throw new BusinessRuleException('Invalid email or OTP');
+    }
+
+    // Find valid OTP token
+    const resetToken = await (this.prisma as any).passwordReset.findFirst({
+      where: {
+        accountId: account.id,
+        token: otp,
+        used: false,
+        expiresAt: { gt: new Date() },
+      } as any,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!resetToken) {
+      throw new BusinessRuleException('Invalid or expired OTP');
+    }
+
+    // Revoke all refresh tokens and mark OTP as used in a transaction
+    await this.prisma.$transaction(async (tx) => {
+      // Revoke all refresh tokens
+      await (tx as any).refreshToken.updateMany({
+        where: { accountId: account.id } as any,
+        data: { revoked: true },
+      });
+
+      // Mark OTP as used
+      await (tx as any).passwordReset.update({
+        where: { id: resetToken.id },
+        data: { used: true },
+      });
+    });
+
+    // Send confirmation email
+    await this.email.sendLogoutAllConfirmation(email);
   }
 }
