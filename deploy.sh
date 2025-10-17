@@ -9,6 +9,12 @@
 
 set -euo pipefail
 
+# Self-healing: Ensure this script has execute permission
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+if [ ! -x "$SCRIPT_PATH" ]; then
+    chmod +x "$SCRIPT_PATH"
+fi
+
 BRANCH="production"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_FILE="${REPO_DIR}/deploy.log"

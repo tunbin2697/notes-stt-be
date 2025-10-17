@@ -592,7 +592,13 @@ sudo nano /opt/hooks/hooks.json
 [
   {
     "id": "deploy-backend",
-    "execute-command": "/home/youruser/projects/notes-stt/notes-stt-be/deploy.sh",
+    "execute-command": "/bin/bash",
+    "pass-arguments-to-command": [
+      {
+        "source": "string",
+        "name": "/home/youruser/projects/notes-stt/notes-stt-be/deploy.sh"
+      }
+    ],
     "command-working-directory": "/home/youruser/projects/notes-stt/notes-stt-be",
     "response-message": "Backend deployment triggered!",
     "trigger-rule": {
@@ -622,6 +628,8 @@ sudo nano /opt/hooks/hooks.json
   }
 ]
 ```
+
+> **💡 Note**: Using `/bin/bash` with `pass-arguments-to-command` means the script doesn't need execute permission. This prevents "permission denied" errors after git updates.
 
 **Important customization steps:**
 
@@ -859,6 +867,31 @@ curl -X POST http://localhost:9000/hooks/deploy-backend \
 # Check Nginx proxy
 sudo tail -f /var/log/nginx/notes-stt.baokhangdev.click.access.log
 ```
+
+**Problem**: "Permission denied" when webhook tries to run deploy.sh
+
+This happens when git updates remove execute permission from deploy.sh.
+
+**Solution 1 (Recommended)**: Use bash explicitly in hooks.json (already configured):
+```json
+{
+  "execute-command": "/bin/bash",
+  "pass-arguments-to-command": [
+    {
+      "source": "string",
+      "name": "/home/youruser/projects/notes-stt/notes-stt-be/deploy.sh"
+    }
+  ]
+}
+```
+Then restart webhook: `sudo systemctl restart webhook`
+
+**Solution 2**: Manually restore execute permission:
+```bash
+chmod +x ~/projects/notes-stt/notes-stt-be/deploy.sh
+```
+
+**Solution 3**: The deploy.sh script now has self-healing code that automatically fixes its own permissions at startup (if called with bash).
 
 **Problem**: API not accessible via domain
 
