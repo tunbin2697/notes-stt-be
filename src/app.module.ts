@@ -36,6 +36,7 @@ export class AppResolver {
             safeExtensions.statusCode = extensions.statusCode;
           if (extensions?.errorType)
             safeExtensions.errorType = extensions.errorType;
+          if (extensions?.code) safeExtensions.code = extensions.code;
 
           return { message, extensions: safeExtensions };
         } else {

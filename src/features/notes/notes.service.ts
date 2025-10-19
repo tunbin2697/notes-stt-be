@@ -5,6 +5,7 @@ import { CreateNoteInput } from './dto/create-note.input';
 import { UpdateNoteInput } from './dto/update-note.input';
 import { NoteType } from '../../enums/NoteType';
 import { NoteStatus } from '../../enums/NoteStatus';
+import { NotePriority } from '../../enums/NotePriority';
 
 @Injectable()
 export class NotesService {
@@ -24,6 +25,7 @@ export class NotesService {
     filters?: {
       type?: NoteType;
       status?: NoteStatus;
+      priority?: NotePriority;
       isArchived?: boolean;
       isPinned?: boolean;
       tags?: string[];
@@ -42,6 +44,7 @@ export class NotesService {
     // Type and status filters
     if (filters?.type) where.type = filters.type;
     if (filters?.status) where.status = filters.status;
+    if (filters?.priority) where.priority = filters.priority;
     if (filters?.isArchived !== undefined)
       where.isArchived = filters.isArchived;
     if (filters?.isPinned !== undefined) where.isPinned = filters.isPinned;

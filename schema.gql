@@ -98,6 +98,9 @@ type Query {
     """Filter by status"""
     status: NoteStatus
 
+    """Filter by priority"""
+    priority: NotePriority
+
     """Filter archived notes"""
     isArchived: Boolean
 

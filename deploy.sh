@@ -9,14 +9,9 @@
 
 set -euo pipefail
 
-# Self-healing: Ensure this script has execute permission
-SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-if [ ! -x "$SCRIPT_PATH" ]; then
-    chmod +x "$SCRIPT_PATH"
-fi
-
 BRANCH="production"
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_PATH="${REPO_DIR}/deploy.sh"
 LOG_FILE="${REPO_DIR}/deploy.log"
 
 GREEN='\033[0;32m'
@@ -56,6 +51,12 @@ git fetch origin "$BRANCH" 2>&1 | tee -a "$LOG_FILE"
 git reset --hard "origin/$BRANCH" 2>&1 | tee -a "$LOG_FILE"
 log "Cleaning untracked files"
 git clean -fdx 2>&1 | tee -a "$LOG_FILE"
+
+# CRITICAL: Restore execute permission immediately after git reset
+# git reset --hard replaces deploy.sh with the version from git, which may not have +x
+log "Restoring execute permission on deploy.sh after git reset..."
+chmod +x "$SCRIPT_PATH" 2>&1 | tee -a "$LOG_FILE"
+log "✓ Execute permission restored for next webhook run"
 
 CURRENT_COMMIT=$(git rev-parse --short HEAD)
 CURRENT_COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1)

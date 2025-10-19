@@ -32,11 +32,13 @@ export class NotesResolver {
     @Args() filters: NotesFilterArgs,
   ): Promise<PaginatedNotes> {
     const profileId = ctx.req.user.profileId;
+
     return await this.notesService.findAllByProfile(
       profileId,
       {
         type: filters.type,
         status: filters.status,
+        priority: filters.priority,
         isArchived: filters.isArchived,
         isPinned: filters.isPinned,
         tags: filters.tags,

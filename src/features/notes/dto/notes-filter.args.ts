@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { NoteType } from '../../../enums/NoteType';
 import { NoteStatus } from '../../../enums/NoteStatus';
+import { NotePriority } from '../../../enums/NotePriority';
 
 @ArgsType()
 export class NotesFilterArgs {
@@ -21,6 +22,14 @@ export class NotesFilterArgs {
   @IsOptional()
   @IsEnum(NoteStatus, { message: 'Status must be a valid NoteStatus' })
   status?: NoteStatus;
+
+  @Field(() => NotePriority, {
+    nullable: true,
+    description: 'Filter by priority',
+  })
+  @IsOptional()
+  @IsEnum(NotePriority, { message: 'Priority must be a valid NotePriority' })
+  priority?: NotePriority;
 
   @Field(() => Boolean, {
     nullable: true,

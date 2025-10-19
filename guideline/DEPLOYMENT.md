@@ -836,6 +836,612 @@ sudo tail -f /var/log/nginx/notes-stt.baokhangdev.click.access.log
 sudo tail -f /var/log/nginx/notes-stt.baokhangdev.click.error.log
 ```
 
+### Database Access & Management
+
+#### Monitor Database Queries & Mutations in Production
+
+For production monitoring on your Ubuntu server, use these methods to track all database operations:
+
+---
+
+**🎯 Quick Start: Enable Query Logging (Recommended for Production)**
+
+Run these commands on your Ubuntu server to see all SQL queries in real-time:
+
+```bash
+# Step 1: Enable PostgreSQL query logging
+docker exec -it stt_notes_db psql -U postgres -c "ALTER SYSTEM SET log_statement = 'all';"
+docker exec -it stt_notes_db psql -U postgres -c "ALTER SYSTEM SET log_duration = on;"
+docker exec -it stt_notes_db psql -U postgres -c "ALTER SYSTEM SET log_min_duration_statement = 100;"
+docker exec -it stt_notes_db psql -U postgres -c "SELECT pg_reload_conf();"
+
+# Step 2: Watch queries in real-time
+docker logs -f stt_notes_db 2>&1 | grep -E '(INSERT|UPDATE|DELETE|SELECT)'
+
+# Filter by specific operations
+docker logs -f stt_notes_db 2>&1 | grep 'INSERT INTO "Note"'
+docker logs -f stt_notes_db 2>&1 | grep 'UPDATE "Account"'
+docker logs -f stt_notes_db 2>&1 | grep 'DELETE FROM'
+```
+
+**To disable logging later (save disk space):**
+
+```bash
+docker exec -it stt_notes_db psql -U postgres -c "ALTER SYSTEM SET log_statement = 'none';"
+docker exec -it stt_notes_db psql -U postgres -c "SELECT pg_reload_conf();"
+```
+
+---
+
+**📊 Method 1: Table Statistics (Lightweight)**
+
+See cumulative INSERT/UPDATE/DELETE counts per table:
+
+```bash
+docker exec -it stt_notes_db psql -U postgres -d stt_notes -c "
+SELECT
+  relname as table,
+  n_tup_ins as inserts,
+  n_tup_upd as updates,
+  n_tup_del as deletes,
+  n_live_tup as live_rows
+FROM pg_stat_user_tables
+ORDER BY n_tup_ins + n_tup_upd + n_tup_del DESC;
+"
+```
+
+**With continuous monitoring:**
+
+```bash
+watch -n 2 "docker exec stt_notes_db psql -U postgres -d stt_notes -t -c \"
+SELECT
+  relname as table,
+  n_tup_ins as inserts,
+  n_tup_upd as updates,
+  n_tup_del as deletes
+FROM pg_stat_user_tables
+ORDER BY n_tup_ins + n_tup_upd + n_tup_del DESC;
+\""
+```
+
+---
+
+**🔍 Method 2: Active Query Monitoring**
+
+See currently running queries:
+
+```bash
+# One-time snapshot
+docker exec -it stt_notes_db psql -U postgres -d stt_notes -c "
+SELECT
+  pid,
+  state,
+  SUBSTRING(query, 1, 100) as query_preview,
+  NOW() - query_start AS duration
+FROM pg_stat_activity
+WHERE state != 'idle'
+  AND datname = 'stt_notes'
+ORDER BY query_start DESC;
+"
+
+# Continuous monitoring (Ubuntu)
+watch -n 2 "docker exec stt_notes_db psql -U postgres -d stt_notes -t -c \"
+SELECT
+  pid,
+  state,
+  SUBSTRING(query, 1, 80) as query
+FROM pg_stat_activity
+WHERE state != 'idle'
+  AND datname = 'stt_notes'
+  AND query NOT LIKE '%pg_stat_activity%'
+ORDER BY query_start DESC;
+\""
+```
+
+---
+
+**📝 Method 3: Monitoring Dashboard Script**
+
+Create a comprehensive monitoring dashboard for your Ubuntu server:
+
+```bash
+# Create monitoring script
+nano ~/monitor-db.sh
+```
+
+Paste this content:
+
+```bash
+#!/bin/bash
+
+echo "🔍 PostgreSQL Database Monitor - Press Ctrl+C to stop"
+echo "=================================================="
+
+while true; do
+  clear
+  echo "📊 Database Activity Monitor - $(date)"
+  echo "=================================================="
+
+  # Table operations
+  echo -e "\n📝 Table Operations (Cumulative):"
+  docker exec stt_notes_db psql -U postgres -d stt_notes -t -c "
+    SELECT
+      relname as table,
+      n_tup_ins as inserts,
+      n_tup_upd as updates,
+      n_tup_del as deletes,
+      n_live_tup as rows
+    FROM pg_stat_user_tables
+    WHERE n_tup_ins + n_tup_upd + n_tup_del > 0
+    ORDER BY n_tup_ins + n_tup_upd + n_tup_del DESC;
+  "
+
+  # Active queries
+  echo -e "\n⚡ Active Queries RIGHT NOW:"
+  docker exec stt_notes_db psql -U postgres -d stt_notes -t -c "
+    SELECT
+      SUBSTRING(query, 1, 100) as query,
+      state
+    FROM pg_stat_activity
+    WHERE state != 'idle'
+      AND datname = 'stt_notes'
+      AND query NOT LIKE '%pg_stat_activity%'
+    ORDER BY query_start DESC
+    LIMIT 5;
+  "
+
+  # Connections
+  echo -e "\n� Active Connections:"
+  docker exec stt_notes_db psql -U postgres -d stt_notes -t -c "
+    SELECT COUNT(*) as connections, state
+    FROM pg_stat_activity
+    WHERE datname = 'stt_notes'
+    GROUP BY state;
+  "
+
+  sleep 3
+done
+```
+
+```bash
+# Make executable and run
+chmod +x ~/monitor-db.sh
+~/monitor-db.sh
+```
+
+---
+
+**🎨 Method 4: Monitor GraphQL Operations (Application Level)**
+
+Since you're using GraphQL, monitor at the backend level:
+
+```bash
+# Watch all GraphQL operations
+docker logs -f stt_notes_backend | grep -E '(Query|Mutation)'
+
+# Watch specific mutations
+docker logs -f stt_notes_backend | grep 'createNote'
+docker logs -f stt_notes_backend | grep 'updateNote'
+docker logs -f stt_notes_backend | grep 'deleteNote'
+
+# Watch authentication events
+docker logs -f stt_notes_backend | grep -E '(login|logout|register)'
+```
+
+---
+
+**📌 Quick Reference Commands**
+
+```bash
+# Show active queries RIGHT NOW
+docker exec stt_notes_db psql -U postgres -d stt_notes -c "SELECT pid, state, query FROM pg_stat_activity WHERE state != 'idle';"
+
+# Count operations per table
+docker exec stt_notes_db psql -U postgres -d stt_notes -c "SELECT relname, n_tup_ins, n_tup_upd, n_tup_del FROM pg_stat_user_tables;"
+
+# Watch database logs
+docker logs -f stt_notes_db
+
+# Watch backend logs
+docker logs -f stt_notes_backend
+
+# Check database size
+docker exec stt_notes_db psql -U postgres -d stt_notes -c "SELECT pg_size_pretty(pg_database_size('stt_notes'));"
+
+# Monitor connection count
+watch -n 2 'docker exec stt_notes_db psql -U postgres -c "SELECT count(*) FROM pg_stat_activity;"'
+```
+
+#### Connect to PostgreSQL Database
+
+**Method 1: Using Docker exec (Recommended)**
+
+```bash
+# Connect to PostgreSQL container
+docker exec -it stt_notes_db psql -U postgres -d stt_notes
+
+# You'll see the psql prompt:
+# stt_notes=#
+```
+
+**Method 2: One-line queries**
+
+```bash
+# Run a single query without entering interactive mode
+docker exec -it stt_notes_db psql -U postgres -d stt_notes -c "SELECT * FROM \"Account\" LIMIT 5;"
+```
+
+**Method 3: Connect from host machine (if PostgreSQL client installed)**
+
+```bash
+# Install PostgreSQL client on host (if needed)
+sudo apt-get install postgresql-client -y
+
+# Connect to database (port 5433 is mapped to host)
+psql -h localhost -p 5433 -U postgres -d stt_notes
+# Password: (from your .env POSTGRES_PASSWORD)
+```
+
+#### Common PostgreSQL Commands
+
+**Once connected to psql prompt:**
+
+```sql
+-- List all databases
+\l
+
+-- Connect to a database
+\c stt_notes_db
+
+-- List all tables
+\dt
+
+-- Describe table structure
+\d "Account"
+\d "Profile"
+\d "Note"
+\d "RefreshToken"
+\d "PasswordReset"
+
+-- Show table with indexes and constraints
+\d+ "Account"
+
+-- List all schemas
+\dn
+
+-- List all users/roles
+\du
+
+-- Show current database and user
+\conninfo
+
+-- Get help
+\?
+
+-- Quit psql
+\q
+```
+
+#### Useful Database Queries
+
+**View Users/Accounts:**
+
+```sql
+-- List all accounts
+SELECT id, email, role, "createdAt"
+FROM "Account"
+ORDER BY "createdAt" DESC;
+
+-- Count total accounts
+SELECT COUNT(*) FROM "Account";
+
+-- Find account by email
+SELECT * FROM "Account" WHERE email = 'user@example.com';
+```
+
+**View Profiles:**
+
+```sql
+-- List all profiles with account emails
+SELECT
+  p.id,
+  p."fullName",
+  a.email,
+  p."createdAt"
+FROM "Profile" p
+JOIN "Account" a ON p."accountId" = a.id
+ORDER BY p."createdAt" DESC;
+```
+
+**View Notes:**
+
+```sql
+-- List recent notes
+SELECT
+  id,
+  title,
+  type,
+  status,
+  priority,
+  "isPinned",
+  "createdAt"
+FROM "Note"
+ORDER BY "createdAt" DESC
+LIMIT 10;
+
+-- Count notes by type
+SELECT type, COUNT(*) as count
+FROM "Note"
+GROUP BY type;
+
+-- Count notes by status
+SELECT status, COUNT(*) as count
+FROM "Note"
+GROUP BY status;
+
+-- Find notes by user
+SELECT n.id, n.title, n.type, a.email
+FROM "Note" n
+JOIN "Profile" p ON n."profileId" = p.id
+JOIN "Account" a ON p."accountId" = a.id
+WHERE a.email = 'user@example.com';
+```
+
+**View Active Sessions:**
+
+```sql
+-- List active refresh tokens
+SELECT
+  rt.id,
+  a.email,
+  rt."expiresAt",
+  rt.revoked,
+  rt."createdAt"
+FROM "RefreshToken" rt
+JOIN "Account" a ON rt."accountId" = a.id
+WHERE rt.revoked = false
+  AND rt."expiresAt" > NOW()
+ORDER BY rt."createdAt" DESC;
+
+-- Count active sessions per user
+SELECT
+  a.email,
+  COUNT(*) as active_sessions
+FROM "RefreshToken" rt
+JOIN "Account" a ON rt."accountId" = a.id
+WHERE rt.revoked = false
+  AND rt."expiresAt" > NOW()
+GROUP BY a.email;
+```
+
+**View OTP Tokens:**
+
+```sql
+-- List recent OTP tokens (for password reset/logout all)
+SELECT
+  pr.id,
+  a.email,
+  pr.token as otp,
+  pr."expiresAt",
+  pr.used,
+  pr."createdAt"
+FROM "PasswordReset" pr
+JOIN "Account" a ON pr."accountId" = a.id
+ORDER BY pr."createdAt" DESC
+LIMIT 10;
+
+-- Count unused OTPs
+SELECT
+  a.email,
+  COUNT(*) as unused_otps
+FROM "PasswordReset" pr
+JOIN "Account" a ON pr."accountId" = a.id
+WHERE pr.used = false
+  AND pr."expiresAt" > NOW()
+GROUP BY a.email;
+```
+
+#### Database Maintenance
+
+**Check database size:**
+
+```sql
+-- Database size
+SELECT
+  pg_database.datname,
+  pg_size_pretty(pg_database_size(pg_database.datname)) AS size
+FROM pg_database
+WHERE datname = 'stt_notes_db';
+
+-- Table sizes
+SELECT
+  schemaname,
+  tablename,
+  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+```
+
+**Vacuum and analyze:**
+
+```sql
+-- Vacuum database (reclaim storage)
+VACUUM FULL;
+
+-- Analyze tables (update statistics)
+ANALYZE;
+
+-- Vacuum specific table
+VACUUM FULL "Note";
+```
+
+**Check database connections:**
+
+```sql
+-- Current connections
+SELECT
+  datname,
+  usename,
+  application_name,
+  client_addr,
+  state,
+  query
+FROM pg_stat_activity
+WHERE datname = 'stt_notes_db';
+
+-- Kill a specific connection (if needed)
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE pid = 12345;
+```
+
+#### Backup and Restore
+
+**Create backup:**
+
+```bash
+# Backup entire database
+docker exec stt_notes_db pg_dump -U postgres stt_notes_db > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Backup specific tables
+docker exec stt_notes_db pg_dump -U postgres -t "Account" -t "Profile" stt_notes_db > backup_users.sql
+
+# Backup with custom format (smaller, faster)
+docker exec stt_notes_db pg_dump -U postgres -Fc stt_notes > backup.dump
+```
+
+**Restore from backup:**
+
+```bash
+# Restore from SQL file
+cat backup_20251017_143000.sql | docker exec -i stt_notes_db psql -U postgres -d stt_notes
+
+# Restore from custom format
+docker exec -i stt_notes_db pg_restore -U postgres -d stt_notes -c < backup.dump
+
+# Create new database and restore
+docker exec -it stt_notes_db psql -U postgres -c "CREATE DATABASE stt_notes_restore;"
+cat backup.sql | docker exec -i stt_notes_db psql -U postgres -d stt_notes_restore
+```
+
+**Automated backup script:**
+
+```bash
+# Create backup script
+nano ~/backup-db.sh
+```
+
+```bash
+#!/bin/bash
+BACKUP_DIR=~/backups/postgres
+mkdir -p $BACKUP_DIR
+
+# Create backup with timestamp
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+docker exec stt_notes_db pg_dump -U postgres -Fc stt_notes > $BACKUP_DIR/backup_$TIMESTAMP.dump
+
+# Keep only last 7 days of backups
+find $BACKUP_DIR -name "backup_*.dump" -mtime +7 -delete
+
+echo "Backup completed: backup_$TIMESTAMP.dump"
+```
+
+```bash
+# Make executable
+chmod +x ~/backup-db.sh
+
+# Test backup
+~/backup-db.sh
+
+# Add to crontab for daily backups at 2 AM
+crontab -e
+# Add this line:
+# 0 2 * * * /home/youruser/backup-db.sh >> /home/youruser/backup.log 2>&1
+```
+
+#### Prisma Migrations
+
+**Check migration status:**
+
+```bash
+# Enter backend container
+docker exec -it stt_notes_backend sh
+
+# Check Prisma migration status
+npx prisma migrate status
+
+# Exit container
+exit
+```
+
+**Apply pending migrations:**
+
+```bash
+# Run migrations (this is done automatically in deploy.sh)
+docker exec -it stt_notes_backend npx prisma migrate deploy
+```
+
+**Reset database (⚠️ DANGEROUS - deletes all data!):**
+
+```bash
+# Only use in development!
+docker exec -it stt_notes_backend npx prisma migrate reset
+```
+
+#### Troubleshooting Database Issues
+
+**Problem: Can't connect to database**
+
+```bash
+# Check if database container is running
+docker ps | grep stt_notes_db
+
+# Check database logs
+docker logs stt_notes_db
+
+# Check if PostgreSQL is accepting connections
+docker exec stt_notes_db pg_isready -U postgres
+
+# Restart database container
+docker restart stt_notes_db
+```
+
+**Problem: Database is locked or slow**
+
+```sql
+-- Check for long-running queries
+SELECT
+  pid,
+  now() - pg_stat_activity.query_start AS duration,
+  query,
+  state
+FROM pg_stat_activity
+WHERE state != 'idle'
+  AND now() - pg_stat_activity.query_start > interval '5 minutes'
+ORDER BY duration DESC;
+
+-- Kill long-running query (if needed)
+SELECT pg_terminate_backend(12345);
+```
+
+**Problem: Database is full**
+
+```bash
+# Check disk space
+docker exec stt_notes_db df -h
+
+# Check database size (from psql)
+SELECT pg_size_pretty(pg_database_size('stt_notes_db'));
+
+# Clean up old data (from psql)
+-- Delete old expired OTPs
+DELETE FROM "PasswordReset" WHERE "expiresAt" < NOW() - INTERVAL '30 days';
+
+-- Delete old revoked tokens
+DELETE FROM "RefreshToken" WHERE revoked = true AND "createdAt" < NOW() - INTERVAL '30 days';
+```
+
 ---
 
 ## Troubleshooting
