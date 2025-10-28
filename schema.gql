@@ -127,6 +127,11 @@ type Query {
 type Mutation {
   register(email: String!, password: String!): Boolean!
   login(input: LoginInput!): Tokens!
+
+  """
+  Google One Tap authentication - registers new user or logs in existing user
+  """
+  googleAuth(input: GoogleAuthInput!): Tokens!
   refresh: Tokens!
   logout: Boolean!
   changePassword(input: ChangePasswordInput!): Boolean!
@@ -149,6 +154,11 @@ type Mutation {
 input LoginInput {
   email: String!
   password: String!
+}
+
+input GoogleAuthInput {
+  """Google ID token from Google One Tap"""
+  idToken: String!
 }
 
 input ChangePasswordInput {

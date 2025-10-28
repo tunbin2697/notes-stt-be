@@ -1,8 +1,7 @@
 export const SECURITY_CONFIG = {
   jwt: {
-    secretEnv: 'JWT_SECRET',
     defaultSecret: process.env.JWT_SECRET || 'change_this_secret',
-    accessExpiresIn: '30m',
+    accessExpiresIn: '10m',
     refreshExpiresIn: '7d',
   },
   cookie: {
@@ -32,5 +31,8 @@ export const SECURITY_CONFIG = {
     // Note: Escaped backslashes are necessary when defining a regex as a string.
     MIN_LENGTH: 8,
     MESSAGE: 'Password must contain uppercase, lowercase, and a number.',
+  },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
   },
 };

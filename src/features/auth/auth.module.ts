@@ -7,6 +7,7 @@ import { PrismaModule } from '@/prisma/prisma.module';
 import { JwtStrategy } from '../../common/security/strategies/jwt.strategy';
 import { UsersModule } from '@/features/user/users.module';
 import { EmailService } from '@/common/services/email.service';
+import { SECURITY_CONFIG } from '@/config/security.config';
 
 @Module({
   imports: [
@@ -14,8 +15,7 @@ import { EmailService } from '@/common/services/email.service';
     UsersModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'change_this_secret',
-      signOptions: { expiresIn: '30m' },
+      secret: SECURITY_CONFIG.jwt.defaultSecret,
     }),
   ],
   providers: [AuthService, AuthResolver, JwtStrategy, EmailService],

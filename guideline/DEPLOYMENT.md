@@ -266,7 +266,44 @@ git clone https://github.com/tunbin2697/notes-stt-be.git
     └── package.json
 ```
 
-### 2. Environment Variables
+### 2. Set Up Proper Permissions
+
+**Important**: Set up group permissions so that both your user and the webhook service can access and modify files without permission issues.
+
+```bash
+# Create a webdev group (if it doesn't exist)
+sudo groupadd webdev
+
+# Add your user and webhook user to the webdev group
+sudo usermod -a -G webdev $USER
+sudo usermod -a -G webdev $USER  # Replace with webhook service user if different
+
+# Set ownership of project directories
+sudo chown -R $USER:webdev ~/projects/notes-stt
+sudo chown -R $USER:webdev /var/www/notes-stt.baokhangdev.click
+
+# Set permissions: owner and group can read/write/execute
+sudo chmod -R 775 ~/projects/notes-stt
+sudo chmod -R 775 /var/www/notes-stt.baokhangdev.click
+
+# Set SGID bit so new files inherit group ownership
+sudo chmod g+s ~/projects/notes-stt
+sudo chmod g+s /var/www/notes-stt.baokhangdev.click
+
+# Verify permissions
+ls -la ~/projects/notes-stt
+ls -la /var/www/notes-stt.baokhangdev.click
+```
+
+**What this does:**
+
+- ✅ Creates a shared `webdev` group for collaboration
+- ✅ Both your user and webhook can read/write files
+- ✅ `775` permissions: owner & group have full access, others can read/execute
+- ✅ `g+s` (SGID): new files automatically inherit the group ownership
+- ✅ No more permission denied errors after git operations!
+
+### 3. Environment Variables
 
 **Important**: The `.env` file contains secrets and should NOT be committed to Git. We'll store it in a protected location outside the repository.
 
@@ -510,14 +547,9 @@ The webhook tool can pass environment variables to `deploy.sh` when triggered, e
 
 ---
 
-### 3. Make deploy.sh Executable
-
-```bash
-cd ~/projects/notes-stt/notes-stt-be
-chmod +x deploy.sh
-```
-
 ### 4. Test Docker Build
+
+**Note**: With the group permissions set up in step 2, you don't need to manually make deploy.sh executable. The webhook will use `/bin/bash` to execute it.
 
 ```bash
 cd ~/projects/notes-stt/notes-stt-be
@@ -1497,31 +1529,53 @@ sudo tail -f /var/log/nginx/notes-stt.baokhangdev.click.access.log
 
 **Problem**: "Permission denied" when webhook tries to run deploy.sh
 
-This happens when git updates remove execute permission from deploy.sh.
+This issue is resolved by proper group permissions setup (see "Set Up Proper Permissions" in Backend Deployment Setup section).
 
-**Solution 1 (Recommended)**: Use bash explicitly in hooks.json (already configured):
+**If you still encounter permission errors:**
 
-```json
-{
-  "execute-command": "/bin/bash",
-  "pass-arguments-to-command": [
-    {
-      "source": "string",
-      "name": "/home/youruser/projects/notes-stt/notes-stt-be/deploy.sh"
-    }
-  ]
-}
-```
+1. **Verify group permissions are set correctly**:
 
-Then restart webhook: `sudo systemctl restart webhook`
+   ```bash
+   # Check directory ownership and permissions
+   ls -la ~/projects/notes-stt
 
-**Solution 2**: Manually restore execute permission:
+   # Should show: drwxrwsr-x ... youruser webdev
+   # The 's' in 'rws' means SGID is set
+   ```
 
-```bash
-chmod +x ~/projects/notes-stt/notes-stt-be/deploy.sh
-```
+2. **Verify webhook user is in webdev group**:
 
-**Solution 3**: The deploy.sh script now has self-healing code that automatically fixes its own permissions at startup (if called with bash).
+   ```bash
+   groups $USER
+   # Should include 'webdev'
+
+   # If not, add it:
+   sudo usermod -a -G webdev $USER
+   newgrp webdev  # Activate group without logout
+   ```
+
+3. **Verify hooks.json uses bash execution**:
+
+   ```bash
+   cat /opt/hooks/hooks.json | grep -A 5 "execute-command"
+   # Should show:
+   #   "execute-command": "/bin/bash",
+   #   "pass-arguments-to-command": [...]
+   ```
+
+4. **Test manual execution**:
+   ```bash
+   # Test with bash (should work)
+   /bin/bash ~/projects/notes-stt/notes-stt-be/deploy.sh
+   ```
+
+**Root cause**: Git operations can reset file permissions. The combination of:
+
+- ✅ Webhook using `/bin/bash` (doesn't need +x permission)
+- ✅ Group permissions with SGID (775 + g+s)
+- ✅ Proper group membership
+
+...ensures deployment works reliably without manual intervention.
 
 **Problem**: API not accessible via domain
 

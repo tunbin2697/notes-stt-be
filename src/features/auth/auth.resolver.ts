@@ -9,6 +9,8 @@ import { ChangePasswordInput } from './dto/change-password.input';
 import { ResetPasswordInput } from './dto/reset-password.input';
 import { LoginInput } from './dto/login.input';
 import { LogoutAllInput } from './dto/logout-all.input';
+import { GoogleAuthInput } from './dto/google-auth.input';
+
 @Resolver()
 export class AuthResolver {
   constructor(private auth: AuthService) {}
@@ -36,6 +38,31 @@ export class AuthResolver {
     const accessToken = this.auth.signAccessToken(user.id);
     const refreshToken = await this.auth.signRefreshToken(user.id);
 
+    ctx.res.cookie(
+      SECURITY_CONFIG.cookie.refresh.name,
+      refreshToken,
+      SECURITY_CONFIG.cookie.refresh.options,
+    );
+
+    return { accessToken };
+  }
+
+  @Mutation(() => Tokens, {
+    description:
+      'Google One Tap authentication - registers new user or logs in existing user',
+  })
+  async googleAuth(
+    @Args('input') input: GoogleAuthInput,
+    @Context() ctx: any,
+  ): Promise<Tokens> {
+    // Verify Google token and get/create user
+    const user = await this.auth.authenticateWithGoogle(input.idToken);
+
+    // Generate tokens
+    const accessToken = this.auth.signAccessToken(user.id);
+    const refreshToken = await this.auth.signRefreshToken(user.id);
+
+    // Set refresh token cookie
     ctx.res.cookie(
       SECURITY_CONFIG.cookie.refresh.name,
       refreshToken,

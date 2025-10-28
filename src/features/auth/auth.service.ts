@@ -6,6 +6,72 @@ import { SECURITY_CONFIG } from '@/config/security.config';
 import { BusinessRuleException } from '@/common/exceptions/business-rule.exception';
 import { EmailService } from '@/common/services/email.service';
 
+/**
+ * Convert JWT time string (e.g., '7d', '30m', '1h') to milliseconds
+ * Used to calculate database expiration timestamps
+ */
+function timeStringToMs(timeStr: string): number {
+  const match = timeStr.match(/^(\d+)([smhd])$/);
+  if (!match) throw new Error(`Invalid time string: ${timeStr}`);
+
+  const [, value, unit] = match;
+  const num = parseInt(value, 10);
+
+  const units: Record<string, number> = {
+    s: 1000, // seconds
+    m: 60 * 1000, // minutes
+    h: 60 * 60 * 1000, // hours
+    d: 24 * 60 * 60 * 1000, // days
+  };
+
+  return num * units[unit];
+}
+
+/**
+ * Verify Google ID token and extract user info
+ */
+async function verifyGoogleToken(idToken: string): Promise<{
+  email: string;
+  name?: string;
+  picture?: string;
+  sub: string;
+} | null> {
+  try {
+    const GOOGLE_CLIENT_ID = SECURITY_CONFIG.google.clientId;
+
+    // Verify token with Google's tokeninfo endpoint
+    const response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`,
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.json();
+
+    // Verify audience (client ID)
+    if (payload.aud !== GOOGLE_CLIENT_ID) {
+      return null;
+    }
+
+    // Verify token is not expired
+    if (payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+
+    return {
+      email: payload.email,
+      name: payload.name,
+      picture: payload.picture,
+      sub: payload.sub, // Google user ID
+    };
+  } catch (error) {
+    console.error('Google token verification error:', error);
+    return null;
+  }
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -50,25 +116,93 @@ export class AuthService {
     return safe;
   }
 
+  /**
+   * Google One Tap authentication
+   * Registers new user or logs in existing user
+   */
+  async authenticateWithGoogle(idToken: string) {
+    // Verify Google ID token
+    const googleUser = await verifyGoogleToken(idToken);
+
+    if (!googleUser) {
+      throw new BusinessRuleException('Invalid Google token');
+    }
+
+    // Check if user exists
+    let account = await (this.prisma as any).account.findUnique({
+      where: { email: googleUser.email },
+    });
+
+    // If user doesn't exist, create new account
+    if (!account) {
+      account = await this.prisma.$transaction(async (tx) => {
+        // Create account with Google provider
+        const newAccount = await (tx as any).account.create({
+          data: {
+            email: googleUser.email,
+            password: null, // No password for OAuth users
+            provider: 'google',
+            providerId: googleUser.sub,
+          },
+        });
+
+        // Create profile with Google info
+        await (tx as any).profile.create({
+          data: {
+            accountId: newAccount.id,
+            fullName: googleUser.name || null,
+            avatar: googleUser.picture || null,
+            phone: null,
+            location: null,
+            bio: null,
+          },
+        });
+
+        return newAccount;
+      });
+    } else {
+      // User exists - update provider info if needed
+      if (account.provider !== 'google') {
+        await (this.prisma as any).account.update({
+          where: { id: account.id },
+          data: {
+            provider: 'google',
+            providerId: googleUser.sub,
+          },
+        });
+      }
+    }
+
+    return account;
+  }
+
   async validateUser(email: string, password: string) {
     const user = await (this.prisma as any).account.findUnique({
       where: { email },
     });
     if (!user) return null;
+
+    // Check if account was created via Google OAuth
+    if (user.provider === 'google') {
+      throw new BusinessRuleException(
+        'This account was created using Google Sign-In. Please sign in with Google instead.',
+      );
+    }
+
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) return null;
     return user;
   }
 
   signAccessToken(accountId: number) {
+    const expiresIn = SECURITY_CONFIG.jwt.accessExpiresIn;
     return this.jwt.sign(
       {
         sub: accountId,
+        type: 'access',
       },
       {
-        expiresIn: '15m', // Shorter lifespan for better security
-        issuer: 'dpl-note-app', // Example issuer
-        audience: 'dpl-note-api', // Example audience
+        expiresIn: expiresIn as any,
       },
     );
   }
@@ -76,7 +210,6 @@ export class AuthService {
   async signRefreshToken(accountId: number) {
     const MAX_DEVICES = SECURITY_CONFIG.auth.maxDevices;
 
-    // count active (non-revoked, not expired) refresh tokens for this account
     const now = new Date();
     const activeCount = await (this.prisma as any).refreshToken.count({
       where: {
@@ -90,10 +223,13 @@ export class AuthService {
       throw new BusinessRuleException('Maximum active devices reached');
     }
 
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    // Use refresh token expiration from config
+    const refreshExpiresIn = SECURITY_CONFIG.jwt.refreshExpiresIn;
+    const expiresAt = new Date(Date.now() + timeStringToMs(refreshExpiresIn));
+
     const rawToken = this.jwt.sign(
       { sub: accountId, type: 'refresh' },
-      { expiresIn: '7d' },
+      { expiresIn: refreshExpiresIn as any },
     );
 
     const hashed = await bcrypt.hash(rawToken, 10);
