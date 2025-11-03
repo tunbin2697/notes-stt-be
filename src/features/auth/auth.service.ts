@@ -39,6 +39,17 @@ async function verifyGoogleToken(idToken: string): Promise<{
   try {
     const GOOGLE_CLIENT_ID = SECURITY_CONFIG.google.clientId;
 
+    console.log('GOOGLE_CLIENT_ID (SECURITY_CONFIG):', GOOGLE_CLIENT_ID);
+
+    console.log('process.env.GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID);
+
+    if (!GOOGLE_CLIENT_ID) {
+      console.error('GOOGLE_CLIENT_ID is not set in SECURITY_CONFIG');
+      throw new BusinessRuleException(
+        'Google OAuth is not properly configured',
+      );
+    }
+
     // Verify token with Google's tokeninfo endpoint
     const response = await fetch(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`,
