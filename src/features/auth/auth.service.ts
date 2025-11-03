@@ -53,6 +53,7 @@ async function verifyGoogleToken(idToken: string): Promise<{
 
     // Verify audience (client ID)
     if (payload.aud !== GOOGLE_CLIENT_ID) {
+      throw new BusinessRuleException('Invalid Google token audience');
       return null;
     }
 
