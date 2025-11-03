@@ -59,13 +59,5 @@ async function bootstrap() {
   console.log(`CORS whitelist: ${whitelist.join(', ')}`);
 
   console.log('env loaded:', process.env);
-
-  console.log('process.env.GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID);
-
-  console.log('process.env.port:', process.env.PORT);
-
-  console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
-
-  console.log('process.env.DATABASE_URL:', process.env.DATABASE_URL);
 }
 bootstrap();
