@@ -45,6 +45,7 @@ async function verifyGoogleToken(idToken: string): Promise<{
     );
 
     if (!response.ok) {
+      throw new BusinessRuleException('Failed to verify Google token');
       return null;
     }
 
@@ -57,6 +58,7 @@ async function verifyGoogleToken(idToken: string): Promise<{
 
     // Verify token is not expired
     if (payload.exp * 1000 < Date.now()) {
+      throw new BusinessRuleException('Google token has expired');
       return null;
     }
 
