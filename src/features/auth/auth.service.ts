@@ -46,21 +46,20 @@ async function verifyGoogleToken(idToken: string): Promise<{
 
     if (!response.ok) {
       throw new BusinessRuleException('Failed to verify Google token');
-      return null;
     }
 
     const payload = await response.json();
 
     // Verify audience (client ID)
     if (payload.aud !== GOOGLE_CLIENT_ID) {
+      console.log('Invalid Google token audience:', payload.aud);
+      console.log('Expected audience:', GOOGLE_CLIENT_ID);
       throw new BusinessRuleException('Invalid Google token audience');
-      return null;
     }
 
     // Verify token is not expired
     if (payload.exp * 1000 < Date.now()) {
       throw new BusinessRuleException('Google token has expired');
-      return null;
     }
 
     return {
