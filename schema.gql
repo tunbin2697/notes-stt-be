@@ -82,6 +82,14 @@ type PaginatedNotes {
   pageInfo: PageInfo!
 }
 
+type CorrectedTextResult {
+  """Corrected text from the AI model"""
+  corrected: String!
+
+  """Time taken by the AI model to process (in seconds)"""
+  computeTimeSec: Float!
+}
+
 type Query {
   health: String!
   getMyProfile: Profile!
@@ -149,6 +157,9 @@ type Mutation {
   unpinNote(id: Int!): Note!
   completeTask(id: Int!): Note!
   uncompleteTask(id: Int!): Note!
+
+  """Correct Vietnamese text using AI model (requires authentication)"""
+  correctText(input: CorrectTextInput!): CorrectedTextResult!
 }
 
 input LoginInput {
@@ -209,4 +220,9 @@ input UpdateNoteInput {
   color: String
   isPinned: Boolean
   isArchived: Boolean
+}
+
+input CorrectTextInput {
+  """Text to be corrected"""
+  text: String!
 }

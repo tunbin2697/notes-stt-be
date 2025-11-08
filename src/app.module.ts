@@ -7,6 +7,7 @@ import { AuthModule } from './features/auth/auth.module';
 import { UsersModule } from './features/user/users.module';
 import { NotesModule } from './features/notes/notes.module';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { TextCorrectionModule } from './integrations/text-correction/text-correction.module';
 
 @Resolver()
 export class AppResolver {
@@ -22,6 +23,7 @@ export class AppResolver {
     AuthModule,
     UsersModule,
     NotesModule,
+    TextCorrectionModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'schema.gql'), // auto-generate schema in project root

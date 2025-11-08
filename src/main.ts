@@ -29,6 +29,10 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+
       // Allow requests with no origin (like curl, Postman, or internal proxies)
       if (!origin) return callback(null, true);
 
