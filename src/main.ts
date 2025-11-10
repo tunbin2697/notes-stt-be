@@ -62,6 +62,6 @@ async function bootstrap() {
   );
   console.log(`CORS whitelist: ${whitelist.join(', ')}`);
 
-  console.log('env loaded:', process.env);
+  // console.log('env loaded:', process.env);
 }
 bootstrap();
